@@ -33,8 +33,8 @@ Resume rule: if work is interrupted, read this file first and continue from the 
 - [x] Dockerfile + docker-compose.yml, one command, prints URL
 - [x] README (problem, demo steps, mermaid diagram, offline vs key mode, fallbacks, rules table, run)
 - [x] Strict self-review + fixes
-- [ ] Fresh clone → docker compose up → app works → tests pass
-- [ ] Final report (repo URL, run steps, line count, demo script)
+- [x] Fresh clone → docker compose up → app works → tests pass
+- [x] Final report (repo URL, run steps, line count, demo script)
 
 ## Self-review log
 - Fresh clone with no `.env`: compose uses `${VAR:-}` defaults, so it starts in offline mode
@@ -46,3 +46,9 @@ Resume rule: if work is interrupted, read this file first and continue from the 
 - Clarified: parser plausibility ranges are input checks; clinical thresholds live only in rules.py
 - Clarified: abdominal pain alert worded honestly (deliberate over-alert)
 - Verified: no secrets in tracked files; non-root container; healthcheck; SPA path-traversal guard
+
+## Fresh-clone verification (2026-11-27)
+- Cleared local images, volumes and build cache, then `git clone` into a temp folder with no `.env`
+- `docker compose up` → built from scratch, container healthy, logs print `open http://localhost:8000`, offline mode
+- UI: Try sample → fields + red alert with reasons → Hindi read-back → save → due-tomorrow and risk counts update
+- `docker compose run --rm app pytest` → 111 passed

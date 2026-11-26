@@ -42,7 +42,7 @@ def build_summary(f: VisitFields, alerts: list[Alert], today: date) -> str:
         parts.append(f"अगली विज़िट {hindi_date(f.next_visit_date, today)}")
     red = [a for a in alerts if a.severity == "red"]
     if red:
-        parts.append("खतरे का संकेत: " + ", ".join(a.title_hi for a in red) + ". " + red[0].action_hi)
+        parts.append("खतरे का संकेत: " + ", ".join(a.title_hi for a in red) + "। " + red[0].action_hi)
     elif alerts:
         parts.append("ध्यान दें: " + ", ".join(a.title_hi for a in alerts))
     return "। ".join(parts) + "। क्या यह सही है? हाँ या नहीं बोलिए।"
