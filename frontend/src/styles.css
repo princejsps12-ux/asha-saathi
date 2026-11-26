@@ -259,3 +259,4 @@ h1, h2, h3 { margin: 0; }
 .crash-icon { font-size: 3rem; margin: 0; }
 .crash .bi { align-items: center; }
 .badge-offline { display: inline-flex; align-items: center; gap: 6px; }
+.risk-chip.risk-red .bi-sub { color: rgba(255, 255, 255, .88); }
