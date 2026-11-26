@@ -23,7 +23,8 @@ RUN ruff check .
 COPY --from=web /web/dist ./static
 RUN useradd --create-home --uid 1000 asha && mkdir -p /data && chown asha /data
 USER asha
+# Listens on $PORT (default 8000); cloud hosts such as Render set PORT themselves.
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"
+    CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://localhost:{os.getenv(\"PORT\", \"8000\")}/api/health')"
 CMD ["python", "-m", "app.serve"]
