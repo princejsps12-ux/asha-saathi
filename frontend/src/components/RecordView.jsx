@@ -5,6 +5,7 @@ import { translate } from '../i18n.js'
 import { RISK_ICON } from '../labels.js'
 import { Bi, useI18n } from '../lang.jsx'
 import { clearPending, loadPending, savePending } from '../pendingVisit.js'
+import { forSpeech } from '../spokenText.js'
 import { browserSttSupported, listen, recordAudio, recorderSupported, speak, speechLang, stopSpeaking } from '../speech.js'
 import AlertList from './AlertList.jsx'
 import { ErrorNote } from './Feedback.jsx'
@@ -43,7 +44,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   const canListen = browserSttSupported || useServerStt
   const pending = Boolean(analysis) && PENDING_PHASES.has(phase)
   const voice = speechLang(lang)
-  const say = (text) => speak(text, voice)
+  const say = (text) => speak(forSpeech(text, lang), voice) // abbreviations spelled out for TTS only
   const speechError = (code) => (translate('en', `err_${code}`) === `err_${code}`
     ? { k: 'err_other', vars: { code } } : { k: `err_${code}` })
 

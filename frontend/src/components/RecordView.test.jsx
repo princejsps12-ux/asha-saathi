@@ -207,3 +207,18 @@ describe('live-site phone bug: mixed Roman + Devanagari dictation', () => {
     expect(api.extract).toHaveBeenLastCalledWith(PHONE_TEXT)
   })
 })
+
+describe('spoken read-back vs on-screen text', () => {
+  it('TTS hears "एफ़-आर-यू यानी बड़े अस्पताल" while the screen keeps "FRU"', async () => {
+    const summary = 'खतरे का संकेत: बहुत ज़्यादा बीपी। तुरंत 108 एम्बुलेंस बुलाएँ / FRU रेफ़र करें।'
+    api.extract.mockResolvedValueOnce(analysisOf(FIELDS, { summary_hi: summary }))
+    script.push(DICTATION, '', '')
+    render(<RecordView {...props} onSaved={vi.fn()} />)
+    fireEvent.click(mic())
+    await waitForAnswerPrompt()
+    const spoken = speak.mock.calls.map(([text]) => text).join(' ')
+    expect(spoken).toContain('एफ़-आर-यू यानी बड़े अस्पताल')
+    expect(spoken).not.toContain('FRU')
+    expect(document.querySelector('.readback-text').textContent).toContain('/ FRU रेफ़र करें') // screen unchanged
+  })
+})

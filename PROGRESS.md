@@ -123,3 +123,8 @@ Reported on a phone: transcript "Sunita Sahu सात महीने BP 150 �
 - [x] Mobile recognition: interim-only results kept, Android cumulative repeats collapsed, early session end mid-sentence auto-restarts, errors before onend don't drop text, stop() always reports within 1.5 s; dictation falls back to on-screen text
 - [x] Render cold start: 75 s timeout + one retry on network error / 502 / 503 / 504; "Waking up the server…" hint after 6 s; "Try again" re-runs extraction on the same transcript
 - [x] Tests with the exact phone text: backend parser + API (211 pytest), fake mobile engines (speech.test.js), API retry (api.test.js), component tests (no final result, echo, nothing-new, retry) → 55 vitest; all in Docker; mobile viewport (Android UA, 375 px) checked
+
+## TTS abbreviation fix (2026-11-27)
+- [x] The hi-IN voice read "FRU" as "फ्लू". All spoken text now goes through `forSpeech()` (frontend/src/spokenText.js), applied only to speech; the screen is unchanged
+- [x] Hindi: FRU → "एफ़-आर-यू यानी बड़े अस्पताल", PHC → "पी-एच-सी", ANM/IFA/Td/BP spelled out, " / " → "या"; English: FRU → "F-R-U, the first referral hospital", P-H-C, B-P "150 over 100", Hb → haemoglobin, units spoken in full, " / " → "or"
+- [x] Tests: spokenText.test.js (real rule/read-back strings; no Latin abbreviation left in Hindi speech) + component test (speech spelled out, screen still shows FRU) → 61 vitest + 211 pytest in Docker
