@@ -67,7 +67,13 @@ export const STRINGS = {
     phase_thinking: 'समझ रही हूँ…',
     phase_speaking: 'सुनिए, क्या यह सही है?',
     phase_confirming: '"हाँ" या "नहीं" बोलिए',
-    phase_review: 'जाँचें, ज़रूरत हो तो टैप करके बदलें',
+    phase_review: 'माइक दबाकर हाँ या नहीं बोलें',
+    phase_listenAgain: 'फिर से सुन रही हूँ… हाँ या नहीं बोलिए',
+    reviewSub: 'या नीचे हाँ / नहीं दबाएँ, गलत जानकारी पर टैप करके बदलें',
+    confirmYes: 'हाँ ✓', confirmNo: 'नहीं ✗',
+    micAnswer: 'माइक दबाकर जवाब दें',
+    pendingRestored: 'अधूरी विज़िट वापस लाई गई — अभी सेव नहीं हुई है',
+    discardConfirm: 'यह विज़िट अभी सेव नहीं हुई है। इसे हटाकर नई विज़िट शुरू करें?',
     phase_clarify: 'जो साफ़ नहीं सुना, वो दोबारा बोलिए — या "हाँ" बोलकर सेव करें',
     phase_saving: 'सेव हो रहा है…',
     phase_saved: 'सेव हो गया ✓',
@@ -79,9 +85,7 @@ export const STRINGS = {
     glossTitle: 'English gloss · अंग्रेज़ी सार',
     savedBanner: '✓ विज़िट सेव हुई',
     newVisit: '＋ नई विज़िट',
-    save: '✓ हाँ, सेव करें',
     readAgain: '🔊 दोबारा सुनें',
-    reRecord: '🎤 दोबारा बोलें',
     selectFirst: 'पहले लाभार्थी चुनें',
     sayEdit: 'ठीक है। गलत जानकारी पर टैप करके बदलें, या दोबारा बोलें।',
     sayUnknown: 'समझ नहीं आया। नीचे बटन दबाएँ।',
@@ -157,7 +161,13 @@ export const STRINGS = {
     phase_thinking: 'Extracting fields…',
     phase_speaking: 'Reading back — is this correct?',
     phase_confirming: 'Say “yes” to save or “no” to edit',
-    phase_review: 'Check, and tap a field to fix it',
+    phase_review: 'Tap mic and say yes or no',
+    phase_listenAgain: 'Listening again… say yes or no',
+    reviewSub: 'or tap Yes / No below; tap a wrong field to fix it',
+    confirmYes: 'Yes', confirmNo: 'No',
+    micAnswer: 'Tap mic to answer',
+    pendingRestored: 'Unsaved visit restored — not saved yet',
+    discardConfirm: 'This visit is not saved yet. Discard it and start a new visit?',
     phase_clarify: 'Say the unclear part again — or say "yes" to save',
     phase_saving: 'Saving…',
     phase_saved: 'Saved ✓',
@@ -169,9 +179,7 @@ export const STRINGS = {
     glossTitle: 'English gloss',
     savedBanner: '✓ Visit saved',
     newVisit: '＋ New visit',
-    save: '✓ Yes, save',
     readAgain: '🔊 Read again',
-    reRecord: '🎤 Record again',
     selectFirst: 'Select the woman first',
     sayEdit: 'Okay. Tap a wrong field to fix it, or record again.',
     sayUnknown: 'Sorry, I did not catch that. Please use the buttons below.',
@@ -241,8 +249,9 @@ export function parseISODate(iso) {
   return new Date(y, m - 1, d)
 }
 
+/** ISO date `days` after the server's "today" (or the device's today if that hasn't loaded yet). */
 export function addDays(isoToday, days) {
-  const d = parseISODate(isoToday)
+  const d = isoToday ? parseISODate(isoToday) : new Date()
   d.setDate(d.getDate() + days)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }

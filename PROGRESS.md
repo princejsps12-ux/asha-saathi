@@ -87,3 +87,12 @@ Reported from a real recording; Chrome hi-IN STT gave
 - [x] Voice correction: after the read-back she can just say "बीपी 150 बाय 100"; it is merged into the same entry and read back again
 - [x] The exact STT sentence is a Try sample ("Real speech-to-text — unclear BP")
 - [x] Tests: `test_stt_mishearings.py` (exact STT text + dropped zeros, काम/कम, सूजन spellings, बाय/बाई/ओवर/upar-neeche, run-on negation, corrections) + API tests → 201 pytest + 16 vitest, all passing in Docker
+
+## Confirm-step bug fixes (2026-11-27)
+Reported from a real mic test: a pause after "क्या यह सही है?" ended listening, and the next mic tap reset the whole visit.
+- [x] A pending visit is never lost: while it waits for confirmation, a mic tap listens **only** for the answer (haan / nahi / a correction like "बीपी 150 बाय 100") and keeps all fields; only **New visit** (with a confirm prompt) or a save clears it; Try sample is hidden while a visit is pending
+- [x] Longer answer window (~9 s before speech starts) plus one automatic retry on silence; bilingual hint "माइक दबाकर हाँ या नहीं बोलें / Tap mic and say yes or no"; the answer being heard is shown live
+- [x] Big **हाँ ✓ Yes / नहीं ✗ No** buttons always visible while a visit is pending
+- [x] Pending visit kept in localStorage (24 h, safe with blocked storage); a refresh restores it with a "not saved yet" notice
+- [x] Found during browser verification: restoring before the server date loaded crashed the next-visit chips → fixed, regression-tested
+- [x] Tests: component tests (pause then tap mic → fields kept; correction after timeout; refresh restores pending visit; Yes/No; New visit) + unit tests for confirmFlow and pendingVisit — 36 vitest + 201 pytest, all passing in Docker; mutation-checked (re-introducing the bug fails 4 tests)

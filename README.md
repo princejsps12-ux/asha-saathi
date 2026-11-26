@@ -23,7 +23,9 @@ The cost of a late entry is clinical, not clerical. **High BP, bleeding, severe 
 4. Watch the fields fill in: month 5, BP 142/92, swelling + headache, IFA yes, Td-2, next visit *kal*.
 5. A **red alert** appears: *High BP* + *Pre-eclampsia warning signs*. Each alert says **why** it fired (`BP 142/92 ≥ 140/90`) and **which guideline** it comes from.
 6. Under the Hindi transcript, an **English gloss** of the extracted visit appears (built from the extracted fields, so it works offline). The **read-back summary** card shows the Hindi summary with the English one underneath.
-7. The app **reads the summary aloud** (Hindi in हिं + EN / हिं, English in EN) and listens for **"haan" / "nahi"** (or *yes* / *no*). Say *haan*, or tap **✓ Save**.
+7. The app **reads the summary aloud** (Hindi in हिं + EN / हिं, English in EN), then listens about 9 seconds for **"haan" / "nahi"** (or *yes* / *no*, or a correction such as *"बीपी 150 बाय 100"*). If she pauses, it listens once more automatically. Big **हाँ ✓ Yes / नहीं ✗ No** buttons are always shown as a tap fallback.
+   - **A pending visit is never lost.** If listening stops, the hint reads *"माइक दबाकर हाँ या नहीं बोलें / Tap mic and say yes or no"*. Tapping the mic then listens **only for the answer** and keeps every extracted field.
+   - The visit is also kept in the browser (localStorage), so a **page refresh restores it**. Only a save, or **＋ New visit** (which asks first), clears it.
 8. Open **📅 कल (Due)**: Rekha now appears in *due tomorrow*. Open **⚠️ Risk**: she is on the high-risk list.
 9. Tap **Try sample** until *Real speech-to-text — unclear BP* comes up. This is the exact text Chrome produced from a real recording, with "150" heard as "15" and कम as काम. The BP field turns amber, nothing is guessed, and the read-back asks for the BP again.
 10. With a mic: tap the big button and say something like
@@ -170,7 +172,7 @@ Other useful commands:
 
 ## Tests
 
-**201 pytest cases + 16 frontend (vitest) cases**, all run inside Docker. The pytest suite runs with `docker compose run --rm app pytest`. Every `docker compose build` also runs ESLint (`--max-warnings 0`), the vitest suite and `ruff check`; any lint warning or failing test fails the build:
+**201 pytest cases + 36 frontend (vitest) cases**, all run inside Docker. The pytest suite runs with `docker compose run --rm app pytest`. Every `docker compose build` also runs ESLint (`--max-warnings 0`), the vitest suite and `ruff check`; any lint warning or failing test fails the build:
 
 - `tests/test_stt_mishearings.py`: the **exact Chrome hi-IN output** of a real spoken visit (`…बीपी 15 बाय 100 … बेबी मूवमेंट काम है…`) and other common mishearings: dropped zeros, reversed or half-heard BP, काम/कम, सूजन spellings, बाय/बाई/ओवर/upar-neeche, run-on sentences, no false "BP unclear" for dates, and the voice correction merge.
 - `tests/test_corpus.py`: **35 realistic visit notes** as ASHAs actually say them — Hindi, Hinglish, English, Hindi number words (`एक सौ दस बटा सत्तर`, `ek sau bees by assi`, `साढ़े सात महीने`), every BP format, weeks to months, weekdays, `तारीख`, `परसों`, negations. Symptoms are compared as exact sets, so a false alarm fails the test.
@@ -178,6 +180,13 @@ Other useful commands:
 - `tests/test_rules.py`: every danger rule, including boundary values (139/89 vs 140/90, Hb 6.8/7.0/10.9/11.0, month 4 vs 5), alert ordering, and a check that every rule cites a source.
 - `tests/test_api.py`: the end-to-end pipeline, the bilingual output (English gloss, English read-back, Hindi + English alert reasons and actions), a fully English spoken visit, persistence, the due-tomorrow and high-risk lists, validation errors, alerts recomputed server-side, offline status, Sarvam with no key (503, no crash), and Gemini both timing out (falls back to the parser) and succeeding (validated merge).
 
+- `frontend/src/components/RecordView.test.jsx` renders the record screen with speech recognition scripted (including silences) and the API mocked. It covers:
+  - **a pause, then a mic tap:** all fields are kept and saved, with no re-dictation
+  - **a correction after a timeout:** "बीपी 150 बाय 100" fills the BP in the same visit
+  - **a refresh:** the pending visit is restored, then saved, and storage is cleared, including before the server's date has loaded
+  - the Yes/No buttons, the longer listening window plus one automatic retry, and **New visit** discarding only after confirmation
+
+  `confirmFlow.test.js` and `pendingVisit.test.js` unit-test the decisions behind this: what a mic tap means, retry on silence, answer and correction handling, and storage expiry, corrupt data and blocked storage.
 - `frontend/src/i18n.test.js`: the default is always bilingual (with nothing stored, and with junk stored), the three toggle options, localStorage save/reload (including blocked storage in private mode), what each mode shows (`linesFor`), Hindi/English key parity, matching placeholders, no Devanagari in English strings, and dates in both languages.
 
 ## Error handling
@@ -210,6 +219,8 @@ asha-saathi/
 └── frontend/src/
     ├── i18n.js             हिं + EN / हिं / EN modes, all UI strings, localStorage (+ i18n.test.js)
     ├── lang.jsx            <Bi> two-line label and the language toggle
+    ├── confirmFlow.js      confirm step: mic-tap meaning, listen + auto-retry, yes/no/correction (+ test)
+    ├── pendingVisit.js     unsaved visit kept in localStorage across refreshes (+ test)
     ├── speech.js           Web Speech recognition, Hindi/English TTS, recorder
     ├── components/RecordView.jsx   mic → extract → read-back → confirm → save
     ├── components/FieldsCard.jsx   tap-to-edit register fields

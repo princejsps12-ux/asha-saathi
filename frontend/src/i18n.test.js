@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_MODE, MODES, MODE_LABELS, STORAGE_KEY, STRINGS, detectMode, formatDate, linesFor, loadMode, mainLang,
+  DEFAULT_MODE, MODES, MODE_LABELS, STORAGE_KEY, STRINGS, addDays, detectMode, formatDate, linesFor, loadMode, mainLang,
   saveMode, translate,
 } from './i18n.js'
 
@@ -97,5 +97,11 @@ describe('formatDate', () => {
     expect(formatDate('2026-11-28', '2026-11-27', 'hi')).toBe('कल · 28 नव')
     expect(formatDate('2026-11-24', '2026-11-27', 'en')).toBe('24 Nov (3 days ago)')
     expect(formatDate(null, '2026-11-27', 'en')).toBe('—')
+    expect(formatDate('2026-11-28', undefined, 'en')).toBe('28 Nov') // server "today" not loaded yet
+  })
+  it('addDays never crashes before the server date has loaded', () => {
+    expect(addDays('2026-11-27', 1)).toBe('2026-11-28')
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01')
+    expect(addDays(undefined, 1)).toMatch(/^\d{4}-\d{2}-\d{2}$/)
   })
 })
