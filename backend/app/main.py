@@ -17,7 +17,7 @@ from .parser import classify_confirmation, parse_visit
 from .rules import evaluate, risk_level
 from .schemas import (SYMPTOM_LABELS, Analysis, EvaluateRequest, ExtractRequest, IntentRequest,
                       VisitCreate, VisitFields)
-from .seed import SAMPLES, seed
+from .seed import SAMPLES, refresh_stale_demo, seed
 from .summary import build_summary
 
 log = logging.getLogger("asha")
@@ -27,6 +27,7 @@ MAX_AUDIO_BYTES = 10 * 1024 * 1024  # ~10 MB is several minutes of compressed sp
 def create_app(settings: Optional[Settings] = None) -> FastAPI:
     settings = settings or get_settings()
     db = Database(settings.db_path)
+    refresh_stale_demo(db, settings.today())
     seed(db, settings.today())
 
     app = FastAPI(title="ASHA Saathi API", version="1.0.0")
@@ -41,6 +42,8 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             if person is None:
                 raise HTTPException(404, "Beneficiary not found")
             fields.beneficiary_name = person["name_hi"]
+        else:
+            fields.beneficiary_name = None  # never show a stale name for an unselected woman
         alerts = evaluate(fields)
         return Analysis(fields=fields, alerts=alerts, risk=risk_level(alerts),
                         summary_hi=build_summary(fields, alerts, settings.today()), engine=engine,
@@ -100,7 +103,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     async def stt(audio: UploadFile = File(...)) -> dict:
         if not settings.sarvam_enabled:
             raise HTTPException(503, "SARVAM_API_KEY not set — use browser speech recognition")
-        data = await audio.read()
+        data = await audio.read(MAX_AUDIO_BYTES + 1)  # bounded read: never buffer a huge upload
         if not data or len(data) > MAX_AUDIO_BYTES:
             raise HTTPException(413 if data else 400, "Audio missing or too large")
         try:

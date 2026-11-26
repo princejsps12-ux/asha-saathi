@@ -70,4 +70,16 @@ def seed(db: Database, today: date) -> None:
             fields.next_visit_date = today + timedelta(days=next_in) if next_in is not None else \
                 visit_day + timedelta(days=28)
             alerts = evaluate(fields)
-            db.add_visit(person_id, visit_day, note, fields, alerts, risk_level(alerts))
+            db.add_visit(person_id, visit_day, note, fields, alerts, risk_level(alerts), is_demo=True)
+    db.set_meta("seeded_on", today.isoformat())
+
+
+def refresh_stale_demo(db: Database, today: date) -> bool:
+    """Re-seed untouched demo data from an earlier day, so 'due tomorrow' stays meaningful.
+    Never touches a database that contains any real (non-demo) visit."""
+    seeded_on = db.get_meta("seeded_on")
+    if seeded_on and seeded_on != today.isoformat() and db.count_user_visits() == 0:
+        db.wipe()
+        seed(db, today)
+        return True
+    return False

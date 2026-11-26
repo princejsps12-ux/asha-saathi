@@ -31,7 +31,18 @@ Resume rule: if work is interrupted, read this file first and continue from the 
 
 ## Delivery
 - [x] Dockerfile + docker-compose.yml, one command, prints URL
-- [ ] README (problem, demo steps, mermaid diagram, offline vs key mode, fallbacks, rules table, run)
-- [ ] Strict self-review + fixes
+- [x] README (problem, demo steps, mermaid diagram, offline vs key mode, fallbacks, rules table, run)
+- [x] Strict self-review + fixes
 - [ ] Fresh clone → docker compose up → app works → tests pass
 - [ ] Final report (repo URL, run steps, line count, demo script)
+
+## Self-review log
+- Fresh clone with no `.env`: compose uses `${VAR:-}` defaults, so it starts in offline mode
+- Fixed: stale beneficiary name kept when no woman selected → cleared server-side (+test)
+- Fixed: `/api/stt` unbounded upload read → bounded to 10 MB
+- Fixed: demo due-dates went stale on later days → untouched demo data auto-refreshes; real data never touched (+test)
+- Fixed: TTS could hang in browsers with no voice → per-sentence safety timeout
+- Fixed: fixed image name in compose made separate clones reuse one image → removed
+- Clarified: parser plausibility ranges are input checks; clinical thresholds live only in rules.py
+- Clarified: abdominal pain alert worded honestly (deliberate over-alert)
+- Verified: no secrets in tracked files; non-root container; healthcheck; SPA path-traversal guard

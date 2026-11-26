@@ -101,6 +101,24 @@ def test_gemini_success_merges_with_parser(tmp_path, monkeypatch):
     assert f["ifa_taking"] is True and f["pregnancy_month"] == 7  # parser fills the gaps
 
 
+def test_unselected_beneficiary_never_keeps_stale_name(client):
+    res = client.post("/api/evaluate", json={"fields": {"beneficiary_name": "पुराना नाम"}}).json()
+    assert res["fields"]["beneficiary_name"] is None and "लाभार्थी का नाम नहीं मिला" in res["summary_hi"]
+
+
+def test_stale_demo_data_is_refreshed_but_real_data_is_kept(tmp_path, settings):
+    app = create_app(settings)
+    app.state.db.set_meta("seeded_on", "2000-01-01")
+    create_app(settings)  # restart on a "later day" with only demo data -> fresh seed
+    assert app.state.db.get_meta("seeded_on") == settings.today().isoformat()
+
+    TestClient(app).post("/api/visits", json={"fields": {"beneficiary_id": 1}})  # real visit
+    app.state.db.set_meta("seeded_on", "2000-01-01")
+    create_app(settings)
+    assert app.state.db.get_meta("seeded_on") == "2000-01-01"  # untouched
+    assert app.state.db.count_user_visits() == 1
+
+
 def test_demo_reset_restores_seed(client):
     client.post("/api/visits", json={"fields": {"beneficiary_id": 1}})
     assert client.post("/api/demo/reset").json()["beneficiaries"] == 5

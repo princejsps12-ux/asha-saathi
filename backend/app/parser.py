@@ -145,6 +145,8 @@ NO_TERMS = ("नहीं", "नही", "ना", "गलत", "मत", "र�
 
 # --------------------------------------------------------------------------- field parsers
 
+# Plausibility ranges below are *input sanity checks* (reject "15 तारीख पर 2" as a BP),
+# not clinical thresholds — those live only in rules.py.
 def parse_bp(text: str) -> tuple[Optional[int], Optional[int]]:
     patterns = (
         r"(\d{2,3})\s*(?:/|by|बाय|बाई|बटा|over|पर|ऑन)\s*(\d{2,3})",

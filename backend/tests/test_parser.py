@@ -193,6 +193,19 @@ def test_hindi_sample_end_to_end():
     assert f.next_visit_date == TODAY + timedelta(days=1)
 
 
+def test_hindi_face_swelling_vision_and_movement_sentence():
+    f = p("सुनीता का बीपी ऊपर 150 नीचे 100, चेहरे पर सूजन, आंखों के आगे धुंधला, बच्चा कम हिल रहा है")
+    assert (f.beneficiary_id, f.bp_systolic, f.bp_diastolic) == (1, 150, 100)
+    assert f.symptoms == ["swelling_face_hands", "blurred_vision"] and f.fetal_movement == "reduced"
+
+
+def test_hinglish_fever_weekday_and_stopped_ifa():
+    f = p("geeta ko kal se bukhar hai, 101 degree, iron ki goli band kar di, somvar ko dobara visit")
+    assert f.beneficiary_id == 2 and f.temperature_f == 101 and f.symptoms == ["fever"]
+    assert f.ifa_taking is False
+    assert f.next_visit_date == date(2026, 11, 30)  # next Monday, not "kal"
+
+
 def test_hinglish_sample_end_to_end():
     f = p(SAMPLES[1]["text"])
     assert f.beneficiary_id == 1 and f.pregnancy_month == 7 and f.hb == 9.5

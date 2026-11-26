@@ -3,7 +3,6 @@
 services:
   app:
     build: .
-    image: asha-saathi:latest
     ports:
       - "${PORT:-8000}:8000"
     environment:

@@ -16,7 +16,7 @@ SYMPTOM_LABELS: dict[str, tuple[str, str]] = {
     "convulsions": ("दौरे / झटके", "Convulsions / fits"),
     "breathlessness": ("सांस फूलना", "Breathlessness"),
     "pallor_weakness": ("कमज़ोरी / पीलापन", "Weakness / pallor"),
-    "abdominal_pain": ("पेट में तेज़ दर्द", "Severe abdominal pain"),
+    "abdominal_pain": ("पेट में दर्द", "Abdominal pain"),
     "fever": ("बुखार", "Fever"),
 }
 

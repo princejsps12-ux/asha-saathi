@@ -129,7 +129,8 @@ def _anaemia(f: VisitFields) -> Optional[str]:
 
 
 def _abdominal_pain(f: VisitFields) -> Optional[str]:
-    return "Severe abdominal pain reported" if _has(f, "abdominal_pain") else None
+    # Over-alerting is deliberate: an ASHA cannot grade pain severity at home.
+    return "Abdominal pain reported — needs examination" if _has(f, "abdominal_pain") else None
 
 
 def _high_fever(f: VisitFields) -> Optional[str]:
@@ -181,7 +182,7 @@ RULES: tuple[Rule, ...] = (
          "[MCP] danger signs; [SBA] fetal movement", _fetal_movement),
     Rule("severe_anaemia", "red", "गंभीर खून की कमी", "Severe anaemia", ACTION_REFER,
          "[AMB] Hb <7 g/dL; [MCP] breathlessness", _severe_anaemia),
-    Rule("abdominal_pain", "red", "पेट में तेज़ दर्द", "Severe abdominal pain", ACTION_REFER,
+    Rule("abdominal_pain", "red", "पेट में दर्द", "Abdominal pain", ACTION_REFER,
          "[MCP] danger signs", _abdominal_pain),
     Rule("high_fever", "red", "तेज़ बुखार", "High fever", ACTION_REFER, "[MCP] high fever; [SBA] ≥38 °C",
          _high_fever),

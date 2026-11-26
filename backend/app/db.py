@@ -31,9 +31,11 @@ CREATE TABLE IF NOT EXISTS visits (
     alerts_json     TEXT NOT NULL,
     risk            TEXT NOT NULL CHECK (risk IN ('red', 'amber', 'normal')),
     next_visit_date TEXT,
+    is_demo         INTEGER NOT NULL DEFAULT 0,
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_visits_beneficiary ON visits(beneficiary_id, visit_date);
+CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 """
 
 # Latest visit per beneficiary (ties broken by id) drives the list, due dates and risk.
@@ -52,6 +54,23 @@ class Database:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.connect() as conn:
             conn.executescript(SCHEMA)
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(visits)")}
+            if "is_demo" not in columns:  # migrate DBs created by an earlier version
+                conn.execute("ALTER TABLE visits ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0")
+
+    def get_meta(self, key: str) -> Optional[str]:
+        with self.connect() as conn:
+            row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else None
+
+    def set_meta(self, key: str, value: str) -> None:
+        with self.connect() as conn:
+            conn.execute("INSERT INTO meta (key, value) VALUES (?, ?) "
+                         "ON CONFLICT(key) DO UPDATE SET value = excluded.value", (key, value))
+
+    def count_user_visits(self) -> int:
+        with self.connect() as conn:
+            return conn.execute("SELECT COUNT(*) FROM visits WHERE is_demo = 0").fetchone()[0]
 
     @contextmanager
     def connect(self) -> Iterator[sqlite3.Connection]:
@@ -110,14 +129,14 @@ class Database:
 
     # ------------------------------------------------------------------ visits
     def add_visit(self, beneficiary_id: int, visit_date: date, transcript: str, fields: VisitFields,
-                  alerts: list[Alert], risk: str) -> int:
+                  alerts: list[Alert], risk: str, is_demo: bool = False) -> int:
         with self.connect() as conn:
             cur = conn.execute(
                 "INSERT INTO visits (beneficiary_id, visit_date, transcript, fields_json, alerts_json, risk, "
-                "next_visit_date) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "next_visit_date, is_demo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (beneficiary_id, visit_date.isoformat(), transcript, fields.model_dump_json(),
                  json.dumps([a.model_dump() for a in alerts], ensure_ascii=False), risk,
-                 fields.next_visit_date.isoformat() if fields.next_visit_date else None))
+                 fields.next_visit_date.isoformat() if fields.next_visit_date else None, int(is_demo)))
             return int(cur.lastrowid)
 
     def visits_for(self, beneficiary_id: int) -> list[dict]:
@@ -135,6 +154,7 @@ class Database:
         with self.connect() as conn:
             conn.execute("DELETE FROM visits")
             conn.execute("DELETE FROM beneficiaries")
+            conn.execute("DELETE FROM meta")
             conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('visits', 'beneficiaries')")
 
 
