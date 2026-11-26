@@ -1,0 +1,13 @@
+{
+  "name": "asha-saathi-deck",
+  "private": true,
+  "type": "module",
+  "description": "Round 2 pitch deck: HTML slides -> PDF with the locally installed Chrome",
+  "scripts": {
+    "screenshots": "node screenshots.mjs",
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "puppeteer-core": "23.11.1"
+  }
+}

@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>ASHA Saathi · आशा साथी — Pitch deck (Build for Bharat, Round 2)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;600;700;800&display=swap" />
+<style>
+  /* 16:9 slides, one per PDF page. Every key point is real text (judges read text). */
+  @page { size: 1280px 720px; margin: 0; }
+  :root {
+    --green: #0b6e4f; --green-dark: #08513a; --green-soft: #e6f2ec;
+    --saffron: #f59e0b; --amber: #b45309; --amber-soft: #fff4e0;
+    --red: #c81e1e; --red-soft: #fdecec; --ink: #1c2321; --muted: #5d6763; --line: #e1ded5; --bg: #f6f3ec;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #888; }
+  body { font-family: 'Noto Sans Devanagari', system-ui, sans-serif; color: var(--ink); }
+  .slide {
+    width: 1280px; height: 720px; overflow: hidden; position: relative; background: var(--bg);
+    padding: 44px 64px 64px; display: flex; flex-direction: column; gap: 18px;
+    page-break-after: always; break-after: page;
+  }
+  .kicker { font-size: 18px; font-weight: 700; color: var(--green); letter-spacing: .06em; text-transform: uppercase; }
+  h1 { font-size: 40px; line-height: 1.15; font-weight: 800; }
+  h1 .hi { display: block; font-size: 24px; font-weight: 600; color: var(--muted); margin-top: 4px; }
+  p, li { font-size: 21px; line-height: 1.4; }
+  ul { padding-left: 26px; display: flex; flex-direction: column; gap: 8px; }
+  .muted { color: var(--muted); }
+  .hi-line { display: block; font-size: .82em; color: var(--muted); font-weight: 500; }
+  .foot {
+    position: absolute; left: 64px; right: 64px; bottom: 18px; display: flex; justify-content: space-between;
+    align-items: flex-end; gap: 24px; font-size: 12px; color: var(--muted);
+  }
+  .foot .src { line-height: 1.35; max-width: 1040px; }
+  .foot .num { white-space: nowrap; font-weight: 600; }
+  .card { background: #fff; border-radius: 18px; padding: 20px 24px; box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 6px 18px rgba(0,0,0,.05); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .pill { display: inline-block; background: var(--green-soft); color: var(--green-dark); border-radius: 999px; padding: 4px 14px; font-size: 17px; font-weight: 600; }
+
+  /* 1. title */
+  .title { background: var(--green); color: #fff; justify-content: center; gap: 22px; }
+  .title .kicker { color: #fde68a; }
+  .title h1 { font-size: 64px; }
+  .title h1 .hi { color: #d1fae5; font-size: 34px; }
+  .title .tag { font-size: 28px; font-weight: 600; }
+  .title .links p { font-size: 22px; }
+  .title .links b { color: #fde68a; }
+  .title .by { font-size: 22px; margin-top: 6px; }
+  .title .foot { color: #c7e7da; }
+
+  /* 2. problem */
+  .quotes { display: flex; flex-direction: column; gap: 12px; }
+  .quote { background: #fff; border-left: 6px solid var(--saffron); border-radius: 12px; padding: 12px 18px; }
+  .quote .hi { font-size: 21px; font-weight: 600; }
+  .quote .en { font-size: 17px; color: var(--muted); margin-top: 2px; }
+  .finding { font-size: 20px; }
+
+  /* 3. flow */
+  .flow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-top: 8px; }
+  .step { background: #fff; border-radius: 16px; padding: 16px 14px; text-align: center; position: relative; box-shadow: 0 4px 14px rgba(0,0,0,.05); }
+  .step .ic { font-size: 40px; }
+  .step b { display: block; font-size: 19px; margin-top: 6px; line-height: 1.25; }
+  .step span { display: block; font-size: 16px; color: var(--muted); margin-top: 4px; line-height: 1.3; }
+  .step:not(:last-child)::after { content: '→'; position: absolute; right: -14px; top: 40%; font-size: 24px; color: var(--green); font-weight: 800; }
+  .zero { background: var(--green); color: #fff; border-radius: 16px; padding: 14px 22px; font-size: 24px; font-weight: 700; }
+
+  /* 4. screenshots */
+  .shots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+  .shot { display: flex; flex-direction: column; gap: 10px; }
+  .shot .frame { height: 360px; border-radius: 18px; overflow: hidden; border: 3px solid #1f2937; background: #fff; }
+  .shot img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+  .shot.mid img { object-position: 50% 40%; }
+  .shot p { font-size: 16px; line-height: 1.3; }
+  .shot p b { display: block; font-size: 17px; }
+
+  /* 5. scale */
+  .stat { background: #fff; border-radius: 18px; padding: 22px 24px; border-top: 6px solid var(--green); }
+  .stat .n { font-size: 46px; font-weight: 800; color: var(--green-dark); line-height: 1.1; }
+  .stat .l { font-size: 19px; margin-top: 8px; line-height: 1.35; }
+
+  /* 6. trust */
+  .trust li b { color: var(--green-dark); }
+
+  /* 7. dependencies */
+  table { width: 100%; border-collapse: separate; border-spacing: 0; background: #fff; border-radius: 16px; overflow: hidden; font-size: 18px; }
+  th, td { text-align: left; padding: 11px 16px; vertical-align: top; line-height: 1.35; border-bottom: 1px solid var(--line); }
+  th { background: var(--green); color: #fff; font-size: 17px; }
+  tr:last-child td { border-bottom: 0; }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: .92em; background: var(--green-soft); padding: 1px 6px; border-radius: 6px; }
+  td.free { color: var(--green-dark); font-weight: 600; white-space: nowrap; }
+
+  /* 8. launch */
+  .road { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .road .card { border-top: 6px solid var(--saffron); padding: 16px 18px; }
+  .road .card b { display: block; font-size: 20px; line-height: 1.25; }
+  .road .card span { display: block; font-size: 16px; color: var(--muted); margin-top: 6px; line-height: 1.35; }
+  .road .no { font-size: 15px; font-weight: 800; color: var(--amber); }
+
+  /* 10. closing */
+  .close { background: var(--green); color: #fff; justify-content: center; gap: 26px; }
+  .close .big { font-size: 40px; font-weight: 800; line-height: 1.25; max-width: 1080px; }
+  .close .big .hi { display: block; font-size: 28px; color: #d1fae5; font-weight: 600; margin-top: 10px; }
+  .close .links p { font-size: 22px; }
+  .close .links b { color: #fde68a; }
+  .close .foot { color: #c7e7da; }
+</style>
+</head>
+<body>
+
+<!-- 1 · Title -->
+<section class="slide title">
+  <div class="kicker">Build for Bharat · Round 2 · Healthcare access</div>
+  <h1>ASHA Saathi - आशा साथी<span class="hi">a voice diary for ASHA / Mitanin workers</span></h1>
+  <p class="tag">बोलिए, लिखिए नहीं · Speak the home visit — the register fills itself.</p>
+  <div class="links">
+    <p><b>Live app:</b> https://asha-saathi-0csj.onrender.com</p>
+    <p><b>Code:</b> https://github.com/princejsps12-ux/asha-saathi</p>
+  </div>
+  <p class="by">Built by Prince Pandey, Manipal University Jaipur</p>
+  <div class="foot"><span>ASHA Saathi · आशा साथी</span><span class="num">1 / 10</span></div>
+</section>
+
+<!-- 2 · Problem -->
+<section class="slide">
+  <div class="kicker">The problem · field research</div>
+  <h1>Paperwork eats the Mitanin's evening<span class="hi">We spoke to 3 Mitanin workers in Gharghoda block, Raigarh, Chhattisgarh.</span></h1>
+  <div class="grid2">
+    <div class="card">
+      <p style="font-weight:700; margin-bottom:8px">What they told us</p>
+      <ul class="finding">
+        <li><b>3–4 registers</b> per pregnant woman</li>
+        <li><b>1–2 hours of paperwork every day</b>, mostly in the evening or at night</li>
+        <li>The <b>same data written twice</b>: in the register and again on the phone</li>
+        <li><b>Network often fails</b>, so entry is delayed</li>
+      </ul>
+    </div>
+    <div class="quotes">
+      <div class="quote"><div class="hi">“रजिस्टर तो काफी रहता है बेटा। 3–4 तो होंगे ही।”</div>
+        <div class="en">“There are a lot of registers, dear. At least 3–4.”</div></div>
+      <div class="quote"><div class="hi">“वही नाम, वही जानकारी फिर डालो।”</div>
+        <div class="en">“The same name, the same details — enter them all again.”</div></div>
+      <div class="quote"><div class="hi">“एक बार महिला को सूजन थी, लेकिन उसने पहले बताया नहीं था।”</div>
+        <div class="en">“Once a woman had swelling, but she had not told us earlier.”</div></div>
+    </div>
+  </div>
+  <div class="foot"><span class="src">Quotes are anonymous, from our conversations with Mitanin workers in Gharghoda block (Raigarh, Chhattisgarh). Hindi original with our English translation.</span><span class="num">2 / 10</span></div>
+</section>
+
+<!-- 3 · Solution -->
+<section class="slide">
+  <div class="kicker">The solution · core voice flow</div>
+  <h1>Speak once. ASHA Saathi does the register.<span class="hi">एक बार बोलिए — रजिस्टर अपने-आप भरेगा।</span></h1>
+  <div class="flow">
+    <div class="step"><div class="ic">🎤</div><b>Speak the visit</b><span>Hindi, Hinglish or English, at your own pace</span></div>
+    <div class="step"><div class="ic">📋</div><b>Fields filled</b><span>Woman, month, BP, Hb, symptoms, IFA, Td, next visit</span></div>
+    <div class="step"><div class="ic">🔊</div><b>Read back aloud</b><span>In Hindi (or English) — she hears what will be saved</span></div>
+    <div class="step"><div class="ic">✅</div><b>“हाँ” → saved</b><span>Say yes, or correct by voice: “बीपी 150 बाय 100”</span></div>
+    <div class="step"><div class="ic">🚨</div><b>Danger alert</b><span>High BP, bleeding, reduced movement… with the reason</span></div>
+    <div class="step"><div class="ic">📅</div><b>Due list updates</b><span>Due tomorrow, high-risk list, visit history</span></div>
+  </div>
+  <div class="zero">Zero typing for the whole visit — voice in, voice back, “हाँ” to save. Big buttons as a tap fallback.</div>
+  <p class="muted">Understands Hindi number words (“एक सौ चालीस बटा नब्बे”), BP said many ways (“140 by 90”, “ऊपर 140 नीचे 90”), dates (“कल”, “परसों”, “अगले हफ्ते”, “15 तारीख”) and Chhattisgarhi / Bhojpuri words for common symptoms.</p>
+  <div class="foot"><span>ASHA Saathi · आशा साथी</span><span class="num">3 / 10</span></div>
+</section>
+
+<!-- 4 · Demo -->
+<section class="slide">
+  <div class="kicker">Demo · real screenshots of the live app</div>
+  <h1>What the Mitanin sees<span class="hi">हिंदी पहले, साथ में अंग्रेज़ी — बड़े बटन, बड़ा टेक्स्ट</span></h1>
+  <div class="shots">
+    <div class="shot"><div class="frame"><img src="img/02-confirm.png" alt="Confirm screen" /></div>
+      <p><b>1 · Spoken visit → read back</b>Transcript plus an English gloss; the app waits for “हाँ / Yes” or a tap.</p></div>
+    <div class="shot"><div class="frame"><img src="img/03-alert.png" alt="Danger alert" /></div>
+      <p><b>2 · Danger alert with the reason</b>“BP 142/92 ≥ 140/90” — what to do, and the guideline page it comes from.</p></div>
+    <div class="shot mid"><div class="frame"><img src="img/06-bp-unclear.png" alt="BP unclear" /></div>
+      <p><b>3 · Never guesses</b>Speech heard “15 बाय 100”: the BP is marked “समझ नहीं आया — दोबारा बोलें / say again”.</p></div>
+    <div class="shot"><div class="frame"><img src="img/07-due.png" alt="Due list" /></div>
+      <p><b>4 · Due tomorrow</b>The saved visit’s next date updates the due list and the high-risk list.</p></div>
+  </div>
+  <div class="foot"><span>Screenshots taken from https://asha-saathi-0csj.onrender.com (phone size). Try it: press “▶ Try sample” — no mic needed.</span><span class="num">4 / 10</span></div>
+</section>
+
+<!-- 5 · Users and scale -->
+<section class="slide">
+  <div class="kicker">Users and scale</div>
+  <h1>Built for India's ASHA workforce<span class="hi">आशा / मितानिन — सबसे पहले उन्हीं के लिए</span></h1>
+  <div class="grid3">
+    <div class="stat"><div class="n">10.29 lakh</div><div class="l">ASHAs in position across India, rural and urban, under NHM (as on 30 June 2024)</div></div>
+    <div class="stat"><div class="n">71,000+</div><div class="l">Mitanins (Chhattisgarh's ASHAs) across 33 districts and 21,000 villages</div></div>
+    <div class="stat"><div class="n">~2.9 crore</div><div class="l">pregnant women targeted every year by India's Universal Immunization Programme</div></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><p><b>Primary users:</b> ASHA / Mitanin workers doing antenatal home visits.</p></div>
+    <div class="card"><p><b>Secondary users:</b> ANMs and PHC medical officers — high-risk list, due list and visit history.</p></div>
+  </div>
+  <div class="foot"><span class="src">Sources: MoHFW (Dept. of Health &amp; Family Welfare), Annual Report 2024-25 — ASHAs: PDF p.35; UIP target: PDF p.13 — https://www.mohfw-dohfw.gov.in/static/uploads/2025/09/45b06af4508a53a059c74efc930d955e.pdf · Mitanins: NIC Informatics, “Chhattisgarh: Strengthening Roots with Digital Growth”, Oct 2025 (NHM DBT Portal) — https://informatics.nic.in/files/websites/october-2025/chhattisgarh.php</span><span class="num">5 / 10</span></div>
+</section>
+
+<!-- 6 · Safety and trust -->
+<section class="slide">
+  <div class="kicker">Safety and trust</div>
+  <h1>It asks instead of guessing<span class="hi">गलत रिकॉर्ड से बेहतर है दोबारा पूछना</span></h1>
+  <div class="grid2">
+    <div class="card">
+      <ul class="trust">
+        <li><b>Read-back before save</b> — nothing is saved until she hears it and says “हाँ”.</li>
+        <li><b>“BP समझ नहीं आया — दोबारा बोलिए / BP not clear, say again”</b> instead of guessing a mis-heard number.</li>
+        <li><b>Never assumes “normal”</b> — unclear baby movement is asked again; an unknown name asks “Add as new woman?”.</li>
+        <li><b>Decision support only</b> — refers to a 24-hour PHC or FRU; it does not diagnose.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <p style="font-weight:700; margin-bottom:8px">Every danger rule is cited (document + page), and every alert says why</p>
+      <ul>
+        <li>MoHFW ANC &amp; Skilled Attendance at Birth guideline, 2010</li>
+        <li>NHSRC CHO training manual on care during pregnancy, 2021</li>
+        <li>Mother and Child Protection (MCP) Card, 2018</li>
+        <li>Anemia Mukt Bharat Abhiyaan guidelines, 2026</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span class="src">Sources: MoHFW “Guidelines for Antenatal Care and Skilled Attendance at Birth by ANMs/LHVs/SNs” (2010) · NHSRC “Training Manual on Care During Pregnancy and Child Birth for CHO at AB-HWC” (2021) · MoHFW &amp; MoWCD MCP Card (2018) · MoHFW “Anemia Mukt Bharat Abhiyaan Operational Guidelines” (June 2026). Page-level citations are in the code (backend/app/rules.py) and the README.</span><span class="num">6 / 10</span></div>
+</section>
+
+<!-- 7 · Dependencies -->
+<section class="slide">
+  <div class="kicker">What it depends on — and what if it gets costly or stops</div>
+  <h1>No paid AI and no API keys in the core flow<span class="hi">कोई API की नहीं — पैसे वाली सेवा बंद हो तो भी ऐप चलता रहे</span></h1>
+  <table>
+    <tr><th style="width:30%">Dependency</th><th style="width:14%">Cost</th><th>If it gets costly or stops working</th></tr>
+    <tr><td><b>Browser speech recognition</b> (built into Chrome)</td><td class="free">Free · needs internet</td><td>Type-in box, plus an offline save queue: visits are kept on the phone and synced when the network returns</td></tr>
+    <tr><td><b>Our rule-based parser + danger rules</b></td><td class="free">Free · our code</td><td>Runs fully on our server — no paid AI, no keys. Nothing to switch off</td></tr>
+    <tr><td><b>Read-back</b> (browser text-to-speech)</td><td class="free">Free · on device</td><td>The same summary is always shown as text, with big हाँ / नहीं buttons</td></tr>
+    <tr><td><b>Optional:</b> Sarvam speech-to-text, Gemini extraction</td><td>Paid · optional</td><td>Off by default. If costly, slow or down: automatic fallback to the built-in parser — the visit still works</td></tr>
+    <tr><td><b>Hosting:</b> Render free tier (Docker)</td><td class="free">Free</td><td>One <code>docker compose up</code> runs it on any Docker host — including state NIC servers</td></tr>
+  </table>
+  <div class="foot"><span>ASHA Saathi · आशा साथी</span><span class="num">7 / 10</span></div>
+</section>
+
+<!-- 8 · Launch plan -->
+<section class="slide">
+  <div class="kicker">Launch plan · first users → growth</div>
+  <h1>Start in Gharghoda, grow with the system that already exists<span class="hi">घरघोड़ा से शुरुआत — फिर ज़िला, फिर पूरा छत्तीसगढ़</span></h1>
+  <div class="road">
+    <div class="card"><div class="no">STEP 1</div><b>Pilot with Mitanins in Gharghoda block</b><span>The same workers who described the problem use it on real visits</span></div>
+    <div class="card"><div class="no">STEP 2</div><b>Block PHC / ANM feedback</b><span>ANMs and the PHC review alerts, due lists and records; we fix what they flag</span></div>
+    <div class="card"><div class="no">STEP 3</div><b>Raigarh district NHM</b><span>Show the pilot results to the district health team</span></div>
+    <div class="card"><div class="no">STEP 4</div><b>Chhattisgarh state Mitanin programme</b><span>Scale through the state programme and its training structure</span></div>
+  </div>
+  <div class="grid2">
+    <div class="card"><p><b>Later:</b> integrate with existing government apps, so data is entered once and not copied again.</p></div>
+    <div class="card"><p><b>We will measure:</b> time saved on paperwork per Mitanin, and danger signs flagged at the visit.</p></div>
+  </div>
+  <div class="foot"><span>ASHA Saathi · आशा साथी</span><span class="num">8 / 10</span></div>
+</section>
+
+<!-- 9 · Roadmap -->
+<section class="slide">
+  <div class="kicker">What Mitanins asked for → roadmap</div>
+  <h1>Their wish list is our roadmap<span class="hi">मितानिनों ने जो माँगा, वही अगला काम</span></h1>
+  <div class="grid2">
+    <div class="card">
+      <p style="font-weight:700; margin-bottom:8px">Asked for in our conversations</p>
+      <ul>
+        <li>Reminders for the next check-up and medicines</li>
+        <li>Saved history, so nothing is entered again</li>
+        <li>Works without network</li>
+        <li>Simple Hindi, few buttons, big text</li>
+      </ul>
+    </div>
+    <div class="card">
+      <p style="font-weight:700; margin-bottom:8px">Already in the app / next</p>
+      <ul>
+        <li><b>Done:</b> visit history and due-tomorrow list; offline save queue; Hindi-first big-text UI with हाँ / नहीं buttons</li>
+        <li><b>Next:</b> check-up and medicine reminders</li>
+        <li><b>Next modules:</b> immunisation and newborn visits</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>ASHA Saathi · आशा साथी</span><span class="num">9 / 10</span></div>
+</section>
+
+<!-- 10 · Closing -->
+<section class="slide close">
+  <div class="kicker" style="color:#fde68a">ASHA Saathi - आशा साथी</div>
+  <div class="big">The Mitanin speaks once — the register fills itself, and a danger sign is flagged at the doorstep, not in the evening paperwork.
+    <span class="hi">एक बार बोलिए — रजिस्टर भरेगा, खतरे का संकेत वहीं दिखेगा।</span></div>
+  <div class="links">
+    <p><b>Live app:</b> https://asha-saathi-0csj.onrender.com — press “▶ Try sample”, no mic needed</p>
+    <p><b>Code:</b> https://github.com/princejsps12-ux/asha-saathi</p>
+    <p>Built by Prince Pandey, Manipal University Jaipur</p>
+  </div>
+  <div class="foot"><span>ASHA Saathi · आशा साथी</span><span class="num">10 / 10</span></div>
+</section>
+
+</body>
+</html>
