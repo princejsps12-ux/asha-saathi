@@ -191,3 +191,16 @@ def test_typed_bp_clears_unclear_flag(client):
     res = client.post("/api/evaluate", json={"fields": {"bp_unclear": True, "bp_heard": "15/100",
                                                          "bp_systolic": 150, "bp_diastolic": 100}}).json()
     assert res["fields"]["bp_unclear"] is False and res["unclear"] == []
+
+
+def test_phone_mixed_script_transcript_via_api(client):
+    from tests.test_stt_mishearings import PHONE_STT
+    res = client.post("/api/extract", json={"transcript": PHONE_STT})
+    assert res.status_code == 200
+    body = res.json()
+    f = body["fields"]
+    assert (f["beneficiary_name"], f["pregnancy_month"]) == ("सुनीता साहू", 7)
+    assert (f["bp_systolic"], f["bp_diastolic"]) == (150, 100)
+    assert f["fetal_movement"] == "reduced" and f["symptoms"] == ["swelling"] and body["unclear"] == []
+    again = client.post("/api/extract", json={"transcript": PHONE_STT, "base": f}).json()
+    assert again["changed"] is False

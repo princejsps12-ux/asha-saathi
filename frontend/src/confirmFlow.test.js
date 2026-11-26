@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { CONFIRM_LISTEN, listenForAnswer, micAction, resolveAnswer } from './confirmFlow.js'
+import { CONFIRM_LISTEN, ECHO_SHARE, echoShare, listenForAnswer, micAction, resolveAnswer } from './confirmFlow.js'
 
 describe('micAction — a mic tap never discards a pending visit', () => {
   it('answers (does not re-dictate) while a visit waits for confirmation', () => {
@@ -53,10 +53,36 @@ describe('resolveAnswer', () => {
     const clear = { fields: {}, unclear: [] }
     expect(await resolveAnswer('नहीं', clear, fakeApi('no', { changed: false }))).toEqual({ action: 'edit' })
     expect(await resolveAnswer('', clear, fakeApi('yes', null))).toEqual({ action: 'silence' })
-    expect(await resolveAnswer('hmm', clear, fakeApi('unknown', { changed: false }))).toEqual({ action: 'unknown' })
+    expect(await resolveAnswer('hmm', clear, fakeApi('unknown', { changed: false }))).toEqual({ action: 'nochange' })
   })
   it('a failing correction request falls back to yes / no', async () => {
     const api = { intent: vi.fn().mockResolvedValue({ intent: 'yes' }), extract: vi.fn().mockRejectedValue(new Error()) }
     expect(await resolveAnswer('हाँ', base, api)).toEqual({ action: 'save' })
+  })
+})
+
+describe('a non-empty answer is never "didn\'t understand"', () => {
+  const readBack = {
+    summary_hi: 'सुनीता साहू। 7 महीने की गर्भवती। बीपी 150 बटा 100। लक्षण: पैरों में सूजन। बच्चे की हलचल कम है। '
+      + 'अगली विज़िट 4 दिसंबर। क्या यह सही है? हाँ या नहीं बोलिए।',
+    summary_en: 'Sunita Sahu. 7 months pregnant. BP 150/100. Symptoms: swelling (feet). Baby movement reduced.',
+    fields: { beneficiary_id: 1 }, unclear: [],
+  }
+  const unchanged = { intent: vi.fn().mockResolvedValue({ intent: 'unknown' }), extract: vi.fn().mockResolvedValue({ changed: false }) }
+
+  it('the phone mic picking up our own read-back is an echo (listen again), not an error', async () => {
+    const echo = 'सुनीता साहू 7 महीने की गर्भवती बीपी 150 बटा 100 लक्षण पैरों में सूजन'
+    expect(echoShare(echo, readBack.summary_hi)).toBeGreaterThanOrEqual(ECHO_SHARE)
+    expect(await resolveAnswer(echo, readBack, unchanged)).toEqual({ action: 'echo' })
+    expect(unchanged.extract).toHaveBeenCalledWith(echo, readBack.fields) // it was still run through extraction
+  })
+  it('short real answers are never mistaken for echo', () => {
+    for (const short of ['हाँ', 'nahi', 'बीपी 150']) expect(echoShare(short, readBack.summary_hi)).toBe(0)
+  })
+  it('any other non-empty answer gives "nothing new — say yes", never "unknown"', async () => {
+    for (const text of ['hmm', 'ठीक है देखते हैं', 'Sunita Sahu सात महीने BP 150 बाय 100', 'kuch nahi bas']) {
+      const { action } = await resolveAnswer(text, readBack, unchanged)
+      expect(['nochange', 'echo', 'edit']).toContain(action)
+    }
   })
 })

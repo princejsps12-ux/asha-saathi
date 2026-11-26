@@ -18,6 +18,8 @@ import FieldsCard from './FieldsCard.jsx'
 // localStorage, and only "New visit" or a successful save clears it.
 
 const PENDING_PHASES = new Set(['speaking', 'confirming', 'review', 'saving'])
+const MAX_ECHO_RELISTENS = 1
+const SLOW_SERVER_MS = 6000 // after this, say the server is waking up (free tier cold start)
 
 export default function RecordView({ status, people, symptomLabels, samples, preset, onSaved }) {
   const { lang, t, plain, pick } = useI18n()
@@ -29,6 +31,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   const [notice, setNotice] = useState(restored ? 'pendingRestored' : null)
   const [retrying, setRetrying] = useState(false)
   const [heardAnswer, setHeardAnswer] = useState('')
+  const [slow, setSlow] = useState(false)
   const [sampleIndex, setSampleIndex] = useState(0)
   const handle = useRef(null)
   const presetRef = useRef(preset)
@@ -63,6 +66,14 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     if (analysis && phase !== 'saved') savePending({ transcript, analysis })
     else clearPending()
   }, [analysis, transcript, phase])
+
+  // A sleeping free-tier server can take ~50 s to wake: say so instead of looking frozen.
+  const waitingForServer = phase === 'thinking' || phase === 'saving'
+  useEffect(() => {
+    if (!waitingForServer) { setSlow(false); return undefined }
+    const timer = setTimeout(() => setSlow(true), SLOW_SERVER_MS)
+    return () => clearTimeout(timer)
+  }, [waitingForServer])
 
   /** Start fresh. Called after a save, or by the "New visit" button (asks before discarding). */
   const newVisit = () => {
@@ -123,11 +134,18 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   async function listenAndResolve(result, id) {
     if (!browserSttSupported) { setPhase('review'); return } // buttons are the fallback
     setPhase('confirming')
-    const answer = await listenForAnswer(() => listenOnce(id), { onRetry: () => setRetrying(true) })
-    if (id !== flow.current) return
-    setRetrying(false)
-    const outcome = await resolveAnswer(answer, result, api)
-    if (id !== flow.current) return
+    let outcome
+    let answer = ''
+    for (let echoes = 0; ; echoes++) {
+      answer = await listenForAnswer(() => listenOnce(id), { onRetry: () => setRetrying(true) })
+      if (id !== flow.current) return
+      setRetrying(false)
+      outcome = await resolveAnswer(answer, result, api)
+      if (id !== flow.current) return
+      // The phone's mic heard our own read-back: ignore it and listen once more.
+      if (outcome.action !== 'echo' || echoes >= MAX_ECHO_RELISTENS) break
+      setRetrying(true)
+    }
     switch (outcome.action) {
       case 'save':
         return save(result)
@@ -135,12 +153,16 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
         setTranscript(`${transcriptRef.current} · ${answer}`)
         setAnalysis(outcome.analysis)
         return readBackAndConfirm(outcome.analysis)
-      case 'silence':
-        setPhase('review') // nothing heard twice: wait; the visit stays, the mic now answers
-        return undefined
-      default:
+      case 'edit':
         setPhase('review')
-        say(t(outcome.action === 'edit' ? 'sayEdit' : 'sayUnknown'))
+        say(t('sayEdit'))
+        return undefined
+      case 'nochange': // heard and understood, but no yes / no and nothing new: never "didn't understand"
+        setPhase('review')
+        say(t('sayNoChange'))
+        return undefined
+      default: // silence, or only our own echo: wait; the visit stays, the mic now answers
+        setPhase('review')
         return undefined
     }
   }
@@ -192,10 +214,21 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
       onError: (code) => id === flow.current && setError(speechError(code)),
       onEnd: (text) => {
         if (id !== flow.current) return
-        setTranscript(text); process(text)
+        // Never lose words that were already on screen (some mobile engines end with no final result).
+        const heard = text || transcriptRef.current
+        setTranscript(heard)
+        if (heard.trim()) setError(null) // an engine error after speech doesn't matter: we have text
+        process(heard)
       },
     })
     return undefined
+  }
+
+  /** Re-run extraction on the transcript already on screen (e.g. after a network error). */
+  function retryExtraction() {
+    setError(null)
+    newFlow()
+    process(transcriptRef.current)
   }
 
   async function startServerStt() {
@@ -256,10 +289,11 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   }
 
   const busy = ['thinking', 'saving'].includes(phase)
+  const canRetryExtraction = Boolean(error) && !analysis && Boolean(transcript.trim()) && phase === 'idle'
   const nextSample = samples[sampleIndex % (samples.length || 1)]
   const phaseKey = phase === 'confirming'
     ? (retrying ? 'phase_listenAgain' : analysis?.unclear?.length ? 'phase_clarify' : 'phase_confirming')
-    : `phase_${phase}`
+    : busy && slow ? 'phase_waking' : `phase_${phase}`
   const micLabel = phase === 'listening' || phase === 'confirming' ? 'micStop' : pending ? 'micAnswer' : 'micStart'
 
   return (
@@ -323,6 +357,9 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
       )}
 
       <ErrorNote error={error} />
+      {canRetryExtraction && (
+        <button type="button" className="btn btn-primary" onClick={retryExtraction}><Bi k="retryExtract" /></button>
+      )}
 
       {analysis && (
         <>

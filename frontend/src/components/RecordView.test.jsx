@@ -20,10 +20,13 @@ vi.mock('../speech.js', () => ({
   stopSpeaking: vi.fn(),
   recordAudio: vi.fn(),
   listen: vi.fn((opts) => {
-    const text = script.length ? script.shift() : ''
+    // A script item is the text heard, or { shown, final } for an engine that displays words
+    // (interim) but ends with a different / empty final result, as mobile engines do.
+    const item = script.length ? script.shift() : ''
+    const { shown, final } = typeof item === 'string' ? { shown: item, final: item } : item
     let ended = false
     const end = (value) => { if (!ended) { ended = true; opts.onEnd(value) } }
-    setTimeout(() => { if (text) opts.onText?.(text); end(text) }, 0)
+    setTimeout(() => { if (shown) opts.onText?.(shown); end(final) }, 0)
     return { stop: () => end('') }
   }),
 }))
@@ -163,5 +166,44 @@ describe('pending visit survives a refresh', () => {
     expect(confirm).toHaveBeenCalledTimes(2)
     await waitFor(() => expect(loadPending()).toBeNull())
     expect(screen.queryByRole('button', { name: /हाँ ✓/ })).toBeNull()
+  })
+})
+
+describe('live-site phone bug: mixed Roman + Devanagari dictation', () => {
+  const PHONE_TEXT = 'Sunita Sahu सात महीने BP 150 बाय 100 पैरों में सूजन है, बेबी मूवमेंट कम है, अगले हफ्ते फिर आऊंगी'
+  const spokenTexts = () => speak.mock.calls.map(([text]) => text)
+
+  it('words shown but no final result from the engine -> still extracted; own read-back echo -> no "समझ नहीं आया"', async () => {
+    const readBackEcho = 'सारांश सारांश सारांश' // the mic hears our own summary_hi ("सारांश") from the speaker
+    script.push({ shown: PHONE_TEXT, final: '' }, readBackEcho, '', '')
+    render(<RecordView {...props} onSaved={vi.fn()} />)
+    fireEvent.click(mic())
+    await waitForAnswerPrompt()
+    expect(api.extract.mock.calls[0]).toEqual([PHONE_TEXT]) // extraction ran on the on-screen words
+    expect(screen.getByText(PHONE_TEXT)).toBeTruthy()
+    expect(listen).toHaveBeenCalledTimes(4) // dictation, echo, then one re-listen (+ its silence retry)
+    expect(spokenTexts().some((text) => text.includes('समझ नहीं आया'))).toBe(false)
+    expect(spokenTexts().some((text) => text.includes('कोई नई जानकारी'))).toBe(false)
+  })
+
+  it('an unclear non-empty answer asks her to say yes — never "समझ नहीं आया"', async () => {
+    script.push(PHONE_TEXT, 'अच्छा ठीक', '')
+    render(<RecordView {...props} onSaved={vi.fn()} />)
+    fireEvent.click(mic())
+    await waitFor(() => expect(spokenTexts().some((text) => text.includes('कोई नई जानकारी नहीं मिली'))).toBe(true))
+    expect(spokenTexts().some((text) => text.includes('समझ नहीं आया'))).toBe(false)
+    expect(screen.getByRole('button', { name: /हाँ ✓/ })).toBeTruthy() // visit kept, Yes still available
+  })
+
+  it('extraction failure keeps the transcript and offers "Try again" on the same words', async () => {
+    api.extract.mockRejectedValueOnce(new Error('cold start'))
+    script.push(PHONE_TEXT, '', '')
+    render(<RecordView {...props} onSaved={vi.fn()} />)
+    fireEvent.click(mic())
+    const retry = await screen.findByRole('button', { name: /दोबारा कोशिश करें/ })
+    expect(screen.getByText(PHONE_TEXT)).toBeTruthy()
+    fireEvent.click(retry)
+    await waitForAnswerPrompt()
+    expect(api.extract).toHaveBeenLastCalledWith(PHONE_TEXT)
   })
 })

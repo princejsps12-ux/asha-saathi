@@ -113,3 +113,13 @@ Every threshold and danger sign in `rules.py` was checked against the actual gov
 - [x] Free instance hours checked: 3.95 of 750 used this month and 22 of 25 services; hours reset on 1 Dec → no risk to staying up until 2 Dec; no other service needs suspending
 - [x] Verified on the live URL: health check and status OK; Try sample → transcript, English gloss, red alerts, Hindi read-back, Yes → saved, and the Due count rose from 2 to 3
 - [x] README links the live demo at the top (notes the free-tier cold start and temporary disk)
+
+## Live-site phone bug (2026-11-27)
+Reported on a phone: transcript "Sunita Sahu सात महीने BP 150 बाय 100 पैरों में सूजन है, बेबी मूवमेंट कम है, अगले हफ्ते फिर आऊंगी" → app said "समझ नहीं आया".
+- [x] Backend ruled out: parser + /api/extract (local and live) extract it fully (month 7, BP 150/100, swelling, reduced movement, next visit +7)
+- [x] Root cause: the confirm step. On a phone the mic hears the app's own read-back (speaker next to mic; Android may skip TTS onend, so listening could start mid-speech). That "answer" had no yes/no and nothing new → "समझ नहीं आया"
+- [x] speak() resolves only when speechSynthesis is really silent, plus a 0.5 s gap; echo of the read-back is detected and re-listened instead of answered
+- [x] A non-empty answer never gets "समझ नहीं आया": it always runs extraction → save / correction / edit / echo / "nothing new — say yes"
+- [x] Mobile recognition: interim-only results kept, Android cumulative repeats collapsed, early session end mid-sentence auto-restarts, errors before onend don't drop text, stop() always reports within 1.5 s; dictation falls back to on-screen text
+- [x] Render cold start: 75 s timeout + one retry on network error / 502 / 503 / 504; "Waking up the server…" hint after 6 s; "Try again" re-runs extraction on the same transcript
+- [x] Tests with the exact phone text: backend parser + API (211 pytest), fake mobile engines (speech.test.js), API retry (api.test.js), component tests (no final result, echo, nothing-new, retry) → 55 vitest; all in Docker; mobile viewport (Android UA, 375 px) checked

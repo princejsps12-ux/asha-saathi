@@ -17,19 +17,35 @@ function keyForStatus(status) {
   return 'err_server'
 }
 
-async function request(path, options = {}) {
-  let res
-  try {
-    res = await fetch(path, {
-      headers: options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' },
-      ...options,
-    })
-  } catch {
-    throw new ApiError('err_unreachable')
+// A free-tier server that went to sleep can take ~50 s to wake and may answer 502/503/504
+// meanwhile. Wait long enough for that, and retry once on a network error or those statuses.
+export const REQUEST_TIMEOUT_MS = 75000
+export const RETRY_DELAY_MS = 1500
+const RETRYABLE_STATUS = new Set([502, 503, 504])
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+export async function request(path, options = {}, { retries = 1, timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    let res
+    try {
+      res = await fetch(path, {
+        headers: options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' },
+        ...options,
+        signal: controller.signal,
+      })
+    } catch {
+      clearTimeout(timer)
+      if (attempt < retries) { await wait(RETRY_DELAY_MS); continue }
+      throw new ApiError('err_unreachable')
+    }
+    clearTimeout(timer)
+    if (RETRYABLE_STATUS.has(res.status) && attempt < retries) { await wait(RETRY_DELAY_MS); continue }
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new ApiError(keyForStatus(res.status), res.status, data.detail)
+    return data
   }
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new ApiError(keyForStatus(res.status), res.status, data.detail)
-  return data
 }
 
 /** Any thrown value -> { k, vars } for <ErrorNote>. Unknown errors get the generic message. */
@@ -54,6 +70,7 @@ export const api = {
   stt: (blob) => {
     const form = new FormData()
     form.append('audio', blob, 'visit.webm')
-    return request('/api/stt', { method: 'POST', body: form })
+    // 503 here means "no Sarvam key", not "server asleep": don't retry
+    return request('/api/stt', { method: 'POST', body: form }, { retries: 0 })
   },
 }

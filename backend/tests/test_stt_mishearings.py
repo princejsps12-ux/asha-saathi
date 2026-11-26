@@ -154,3 +154,26 @@ def test_correction_still_unclear_keeps_asking_and_yes_changes_nothing():
     assert changed and again.bp_unclear and again.bp_heard == "15/10"
     same, changed = merge_correction(base, p("हाँ"))
     assert not changed and same == base
+
+
+# Exact live transcript from the user's PHONE (Android Chrome): Roman name, "BP" in Latin
+# letters, Hindi words, and punctuation the phone engine added.
+PHONE_STT = "Sunita Sahu सात महीने BP 150 बाय 100 पैरों में सूजन है, बेबी मूवमेंट कम है, अगले हफ्ते फिर आऊंगी"
+
+
+def test_phone_mixed_script_sentence_extracts_fully():
+    f = p(PHONE_STT)
+    assert f.beneficiary_id == 1 and f.pregnancy_month == 7
+    assert (f.bp_systolic, f.bp_diastolic) == (150, 100) and not f.bp_unclear
+    assert f.symptoms == ["swelling"] and f.fetal_movement == "reduced"
+    assert f.next_visit_date == TODAY + timedelta(days=7)
+    assert unclear_fields(f) == []
+    assert {"hypertension", "reduced_fetal_movement"} <= {a.code for a in evaluate(f)}
+
+
+def test_phone_sentence_repeated_as_an_answer_changes_nothing():
+    # If the confirm step hears the same visit again (mobile echo / engine repeat), it merges
+    # to "no change" — the UI then asks for yes instead of saying "didn't understand".
+    base = p(PHONE_STT)
+    _, changed = merge_correction(base, p(PHONE_STT))
+    assert changed is False
