@@ -87,7 +87,7 @@ To enable key mode, copy `.env.example` to `.env`, fill in the keys, and run `do
 |---|---|---|
 | Web Speech API (Chrome) | Free | Switch to Sarvam (key), or self-host an open model such as AI4Bharat IndicConformer / Whisper behind the same `/api/stt` endpoint, which the UI already supports |
 | Sarvam STT | Paid, optional | Remove the key: the app reverts to browser STT with no code change |
-| Gemini | Paid, optional | Remove the key: the rule-based parser already handles the full flow and is covered by 100+ tests |
+| Gemini | Paid, optional | Remove the key: the rule-based parser already handles the full flow and is covered by 150+ tests, including 35 realistic spoken sentences |
 | FastAPI, React, SQLite | Open source | — |
 
 No feature in the core flow depends on a paid API.
@@ -156,6 +156,8 @@ docker compose run --rm app pytest
 
 Other useful commands:
 
+- Lint: `docker compose run --rm app ruff check .` (backend); the frontend's `npm run lint` runs inside every build
+
 - After pulling new code: `docker compose up --build`
 - Use another port: `PORT=9000 docker compose up`
 - Start fresh demo data: tap **↺ Reset demo data** in the app, or `docker compose down -v`
@@ -165,13 +167,22 @@ Other useful commands:
 
 ## Tests
 
-**116 pytest cases + 16 frontend (vitest) cases**, all run inside Docker. The pytest suite runs with `docker compose run --rm app pytest`; the vitest suite runs on every `docker compose build`, and a failing test fails the build:
+**154 pytest cases + 16 frontend (vitest) cases**, all run inside Docker. The pytest suite runs with `docker compose run --rm app pytest`. Every `docker compose build` also runs ESLint (`--max-warnings 0`), the vitest suite and `ruff check`; any lint warning or failing test fails the build:
 
+- `tests/test_corpus.py`: **35 realistic visit notes** as ASHAs actually say them — Hindi, Hinglish, English, Hindi number words (`एक सौ दस बटा सत्तर`, `ek sau bees by assi`, `साढ़े सात महीने`), every BP format, weeks to months, weekdays, `तारीख`, `परसों`, negations. Symptoms are compared as exact sets, so a false alarm fails the test.
 - `tests/test_parser.py`: one block per parser rule. Hindi number words, Devanagari digits, every BP format, months/weeks, symptoms with negation, bleeding vs anaemia vs blood test, fetal movement, IFA, Td, every date phrase, Hb/temperature/weight, name matching, and full Hindi and Hinglish sentences.
 - `tests/test_rules.py`: every danger rule, including boundary values (139/89 vs 140/90, Hb 6.8/7.0/10.9/11.0, month 4 vs 5), alert ordering, and a check that every rule cites a source.
 - `tests/test_api.py`: the end-to-end pipeline, the bilingual output (English gloss, English read-back, Hindi + English alert reasons and actions), a fully English spoken visit, persistence, the due-tomorrow and high-risk lists, validation errors, alerts recomputed server-side, offline status, Sarvam with no key (503, no crash), and Gemini both timing out (falls back to the parser) and succeeding (validated merge).
 
 - `frontend/src/i18n.test.js`: the default is always bilingual (with nothing stored, and with junk stored), the three toggle options, localStorage save/reload (including blocked storage in private mode), what each mode shows (`linesFor`), Hindi/English key parity, matching placeholders, no Devanagari in English strings, and dates in both languages.
+
+## Error handling
+
+- Every error the UI can show is **bilingual and says what to do next**, for example *"सर्वर से कनेक्ट नहीं हो पाया… / Can't reach the server. Is the app running?"*. The UI never shows a raw status code or stack trace.
+- The API returns bilingual `detail` messages. Validation errors return a friendly message plus the field names. Unexpected errors are logged on the server and return a generic 500.
+- The microphone being blocked or missing, no speech heard, or no internet each get their own message. Without speech recognition, the app falls back to buttons and **Try sample**.
+- A missing or failing Sarvam or Gemini key falls back to offline mode automatically.
+- A React error boundary catches any rendering crash and shows a calm bilingual screen with a reload button. Saved data lives on the server, so nothing is lost.
 
 ## Project structure
 
@@ -180,18 +191,18 @@ asha-saathi/
 ├── docker-compose.yml      one service, one volume, no keys required
 ├── Dockerfile              node build stage → python runtime serving API + static UI
 ├── .env.example            optional keys (never commit .env)
-├── backend/
+├── backend/              (ruff.toml: lint rules)
 │   ├── app/
 │   │   ├── numbers.py      Hindi/Hinglish number words → digits
 │   │   ├── parser.py       spoken note → VisitFields (offline)
 │   │   ├── rules.py        ANC danger-sign rules + citations
-│   │   ├── summary.py      Hindi read-back text
+│   │   ├── summary.py      Hindi + English read-back and English gloss
 │   │   ├── integrations.py optional Sarvam STT / Gemini, with fallback
 │   │   ├── db.py           SQLite storage + list queries
 │   │   ├── seed.py         5 demo beneficiaries + sample sentences
-│   │   ├── main.py         FastAPI routes
+│   │   ├── main.py         FastAPI routes + bilingual error handling
 │   │   └── serve.py        entrypoint, prints the app URL
-│   └── tests/              116 pytest cases
+│   └── tests/              154 pytest cases (parser, 35-sentence corpus, rules, API)
 └── frontend/src/
     ├── i18n.js             हिं + EN / हिं / EN modes, all UI strings, localStorage (+ i18n.test.js)
     ├── lang.jsx            <Bi> two-line label and the language toggle
@@ -199,7 +210,8 @@ asha-saathi/
     ├── components/RecordView.jsx   mic → extract → read-back → confirm → save
     ├── components/FieldsCard.jsx   tap-to-edit register fields
     ├── components/AlertList.jsx    danger alerts with "why" + source
-    └── components/Lists.jsx        beneficiaries, history, due, high-risk
+    ├── components/Lists.jsx        beneficiaries, history, due, high-risk
+    └── components/Feedback.jsx     bilingual error notes + crash-safe error boundary
 ```
 
 ## Limitations and next steps

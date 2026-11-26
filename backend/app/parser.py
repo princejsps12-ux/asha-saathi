@@ -10,9 +10,9 @@ Works fully offline with no API key. Design notes:
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import Iterable, Optional
 
 from .numbers import fold, normalize_numbers
 from .schemas import VisitFields
@@ -73,7 +73,8 @@ def _preprocess(text: str) -> str:
 # --------------------------------------------------------------------------- vocab
 
 SYMPTOM_PATTERNS: dict[str, re.Pattern[str]] = {
-    "swelling": _pattern(r"सूजन|सुजन|सूज", r"(?<![a-z])(?:s[ou]{1,2}jaa?n|swelling|swollen|o?edema)(?![a-z])"),
+    # "sujan"/"soojan" (noun) and "sooj gaya"/"suje" (verb: became swollen)
+    "swelling": _pattern(r"सूजन|सुजन|सूज", r"(?<![a-z])(?:s[ou]{1,2}j(?:aa?n|a|e|i)?|swelling|swollen|o?edema)(?![a-z])"),
     "headache": _pattern(r"(?:सिर|सर)\s*(?:में\s*)?(?:बहुत\s*|तेज\s*)?दर्द",
                          r"(?<![a-z])(?:sir|sar)\s*(?:me|mein|main)?\s*(?:bahut\s*|tez\s*)?dard",
                          r"head\s*ache"),
@@ -149,7 +150,7 @@ NO_TERMS = ("नहीं", "नही", "ना", "नो", "गलत", "म�
 
 # Plausibility ranges below are *input sanity checks* (reject "15 तारीख पर 2" as a BP),
 # not clinical thresholds — those live only in rules.py.
-def parse_bp(text: str) -> tuple[Optional[int], Optional[int]]:
+def parse_bp(text: str) -> tuple[int | None, int | None]:
     patterns = (
         r"(\d{2,3})\s*(?:/|by|बाय|बाई|बटा|over|पर|ऑन)\s*(\d{2,3})",
         r"(?:ऊपर|upar|uper|upper)\D{0,8}?(\d{2,3})\D{0,20}?(?:नीचे|niche|neeche|lower)\D{0,8}?(\d{2,3})",
@@ -163,9 +164,10 @@ def parse_bp(text: str) -> tuple[Optional[int], Optional[int]]:
     return None, None
 
 
-def parse_pregnancy_month(text: str) -> Optional[int]:
-    m = re.search(rf"(?<!\d)(\d{{1,2}})\s*(?:वां|वा|वें|th|st|nd|rd)?\s*{MONTH_WORDS}(?![a-z]*\s*{LATER_WORDS})",
-                  text)
+def parse_pregnancy_month(text: str) -> int | None:
+    # "(?:\.5)?" accepts "साढ़े सात महीने" (normalised to 7.5): month 7, not the "5".
+    m = re.search(rf"(?<![\d.])(\d{{1,2}})(?:\.5)?\s*(?:वां|वा|वें|th|st|nd|rd)?\s*{MONTH_WORDS}"
+                  rf"(?![a-z]*\s*{LATER_WORDS})", text)
     if m and 1 <= int(m.group(1)) <= 10:
         return int(m.group(1))
     ordinals = "|".join(sorted(map(re.escape, PREG_ORDINALS), key=len, reverse=True))
@@ -179,7 +181,7 @@ def parse_pregnancy_month(text: str) -> Optional[int]:
     return None
 
 
-def _first_number(pattern: str, text: str, lo: float, hi: float) -> Optional[float]:
+def _first_number(pattern: str, text: str, lo: float, hi: float) -> float | None:
     for m in re.finditer(pattern, text):
         value = float(m.group(1))
         if lo <= value <= hi:
@@ -187,17 +189,17 @@ def _first_number(pattern: str, text: str, lo: float, hi: float) -> Optional[flo
     return None
 
 
-def parse_hb(text: str) -> Optional[float]:
+def parse_hb(text: str) -> float | None:
     return _first_number(r"(?:hb|h\s?b|एचबी|एच बी|हीमोग्लोबिन|हिमोग्लोबिन|ha?emoglobin)\D{0,12}?(\d{1,2}(?:\.\d)?)",
                          text, 3, 18)
 
 
-def parse_weight(text: str) -> Optional[float]:
+def parse_weight(text: str) -> float | None:
     value = _first_number(r"(?:वजन|weight|wajan|vajan|wazan)\D{0,10}?(\d{2,3}(?:\.\d)?)", text, 25, 150)
     return value or _first_number(r"(\d{2,3}(?:\.\d)?)\s*(?:किलो|केजी|kg|kilo)", text, 25, 150)
 
 
-def parse_temperature(text: str) -> Optional[float]:
+def parse_temperature(text: str) -> float | None:
     fever = r"(?:बुखार|तापमान|टेम्परेचर|bukh?aa?r|fever|temperature|temp)"
     value = _first_number(rf"{fever}\D{{0,12}}?(\d{{2,3}}(?:\.\d)?)", text, 34, 108) or \
         _first_number(rf"(\d{{2,3}}(?:\.\d)?)\s*(?:डिग्री|degree)?\s*(?:का\s*|ka\s*)?{fever}", text, 34, 108)
@@ -221,7 +223,7 @@ def parse_symptoms(clauses: list[str]) -> list[str]:
     return found
 
 
-def parse_fetal_movement(clauses: list[str]) -> Optional[str]:
+def parse_fetal_movement(clauses: list[str]) -> str | None:
     for clause in clauses:
         if _any(clause, FETAL_TERMS):
             if _any(clause, FETAL_NOT_REDUCED):
@@ -230,17 +232,18 @@ def parse_fetal_movement(clauses: list[str]) -> Optional[str]:
     return None
 
 
-def parse_ifa(clauses: list[str]) -> tuple[Optional[bool], Optional[int]]:
+def parse_ifa(clauses: list[str]) -> tuple[bool | None, int | None]:
     for clause in clauses:
         if not _any(clause, IFA_TERMS):
             continue
-        m = re.search(r"(\d{1,3})\s*(?:गोली|गोलियां|टैबलेट|tablets?|goli|goliyan)", clause)
+        # "30 गोली", "30 आयरन की गोलियां", "30 iron tablets": number up to 3 words before the noun
+        m = re.search(r"(\d{1,3})\s+(?:\S+\s+){0,3}?(?:गोली|गोलियां|टैबलेट|tablets?|goli|goliyan)", clause)
         tablets = int(m.group(1)) if m else None
         return (not _any(clause, IFA_NEGATIVE)), tablets
     return None, None
 
 
-def parse_td(clauses: list[str]) -> tuple[Optional[int], Optional[bool]]:
+def parse_td(clauses: list[str]) -> tuple[int | None, bool | None]:
     for clause in clauses:
         has_td, has_vaccine = _any(clause, TD_TERMS), _any(clause, VACCINE_TERMS)
         if not (has_td or has_vaccine):
@@ -255,7 +258,7 @@ def parse_td(clauses: list[str]) -> tuple[Optional[int], Optional[bool]]:
     return None, None
 
 
-def _date_in(clause: str, today: date) -> Optional[date]:
+def _date_in(clause: str, today: date) -> date | None:
     m = re.search(r"(\d{1,2})\s*(?:दिन|din|days?)\s*(?:बाद|baad|bad|में|me|later|after)", clause) or \
         re.search(r"in\s*(\d{1,2})\s*days?", clause)
     if m:
@@ -289,7 +292,7 @@ def _date_in(clause: str, today: date) -> Optional[date]:
     return None
 
 
-def parse_next_visit(clauses: list[str], today: date) -> Optional[date]:
+def parse_next_visit(clauses: list[str], today: date) -> date | None:
     for clause in clauses:
         if _any(clause, VISIT_TERMS):
             found = _date_in(clause, today)
@@ -303,7 +306,7 @@ def parse_next_visit(clauses: list[str], today: date) -> Optional[date]:
     return None
 
 
-def match_beneficiary(text: str, people: Iterable[KnownBeneficiary]) -> Optional[KnownBeneficiary]:
+def match_beneficiary(text: str, people: Iterable[KnownBeneficiary]) -> KnownBeneficiary | None:
     best, best_score, tie = None, 0, False
     for person in people:
         score = 0

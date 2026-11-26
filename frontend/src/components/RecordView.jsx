@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { api } from '../api.js'
+import { api, toUiError } from '../api.js'
+import { translate } from '../i18n.js'
 import { RISK_ICON } from '../labels.js'
 import { Bi, useI18n } from '../lang.jsx'
 import { browserSttSupported, listen, recordAudio, recorderSupported, speak, speechLang, stopSpeaking } from '../speech.js'
 import AlertList from './AlertList.jsx'
+import { ErrorNote } from './Feedback.jsx'
 import FieldsCard from './FieldsCard.jsx'
 
 // The core flow: speak -> extract -> read back -> confirm by voice -> save -> alert.
@@ -16,7 +18,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   const [phase, setPhase] = useState('idle')
   const [transcript, setTranscriptState] = useState('')
   const [analysis, setAnalysis] = useState(null)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(null) // { k, vars } i18n key, rendered by <ErrorNote>
   const [sampleIndex, setSampleIndex] = useState(0)
   const handle = useRef(null)
   const presetRef = useRef(preset)
@@ -28,7 +30,8 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   const canListen = browserSttSupported || useServerStt
   const voice = speechLang(lang)
   const say = (text) => speak(text, voice)
-  const speechError = (code) => (t(`err_${code}`) === `err_${code}` ? plain('err_other', { code }) : plain(`err_${code}`))
+  const speechError = (code) => (translate('en', `err_${code}`) === `err_${code}`
+    ? { k: 'err_other', vars: { code } } : { k: `err_${code}` })
 
   const setTranscript = (text) => { transcriptRef.current = text; setTranscriptState(text) }
   const newFlow = () => {
@@ -44,7 +47,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
 
   const reset = () => {
     newFlow()
-    setPhase('idle'); setTranscript(''); setAnalysis(null); setError('')
+    setPhase('idle'); setTranscript(''); setAnalysis(null); setError(null)
   }
 
   async function process(text) {
@@ -52,7 +55,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     if (!text.trim()) {
       setError(speechError('no-speech')); setPhase('idle'); return
     }
-    setPhase('thinking'); setError('')
+    setPhase('thinking'); setError(null)
     try {
       let result = await api.extract(text)
       if (result.fields.beneficiary_id == null && presetRef.current) {
@@ -62,7 +65,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
       setAnalysis(result)
       await readBackAndConfirm(result)
     } catch (e) {
-      if (id === flow.current) { setError(e.message); setPhase('idle') }
+      if (id === flow.current) { setError(toUiError(e)); setPhase('idle') }
     }
   }
 
@@ -95,11 +98,11 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   async function save(result = analysis) {
     newFlow()
     if (result?.fields.beneficiary_id == null) {
-      setError(plain('selectFirst')); setPhase('review')
+      setError({ k: 'selectFirst' }); setPhase('review')
       say(t('selectFirst'))
       return
     }
-    setPhase('saving')
+    setPhase('saving'); setError(null)
     try {
       const { analysis: saved } = await api.saveVisit(transcriptRef.current, result.fields)
       setAnalysis(saved); setPhase('saved')
@@ -112,7 +115,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
         })
         : t('saySaved'))
     } catch (e) {
-      setError(e.message); setPhase('review')
+      setError(toUiError(e)); setPhase('review')
     }
   }
 
@@ -146,7 +149,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
             const { transcript: text } = await api.stt(blob)
             setTranscript(text); process(text)
           } catch (e) {
-            setError(plain('sttFallback', { msg: e.message })); setPhase('idle')
+            setError(toUiError(e)); setPhase('idle')
           }
         },
       }
@@ -181,9 +184,9 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     newFlow()
     if (phase === 'confirming' || phase === 'speaking') setPhase('review')
     try {
-      setAnalysis(await api.evaluate(fields)); setError('')
+      setAnalysis(await api.evaluate(fields)); setError(null)
     } catch (e) {
-      setError(e.message)
+      setError(toUiError(e))
     }
   }
 
@@ -210,6 +213,17 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
         </button>
       </div>
 
+      {phase === 'idle' && !analysis && !transcript && (
+        <section className="card intro" aria-label="How it works">
+          <h3><Bi k="introTitle" /></h3>
+          <ol className="intro-steps">
+            <li><span aria-hidden>🎤</span><Bi k="introStep1" /></li>
+            <li><span aria-hidden>📋</span><Bi k="introStep2" /></li>
+            <li><span aria-hidden>🚨</span><Bi k="introStep3" /></li>
+          </ol>
+        </section>
+      )}
+
       {(transcript || phase === 'listening') && (
         <section className="card transcript">
           <h3><Bi k="transcriptTitle" inline /></h3>
@@ -223,7 +237,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
         </section>
       )}
 
-      {error && <p className="error" role="alert">{error}</p>}
+      <ErrorNote error={error} />
 
       {analysis && (
         <>

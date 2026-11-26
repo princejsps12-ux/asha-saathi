@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -24,22 +24,22 @@ SYMPTOM_LABELS: dict[str, tuple[str, str]] = {
 class VisitFields(BaseModel):
     """Structured ANC home-visit register entry."""
 
-    beneficiary_id: Optional[int] = None
-    beneficiary_name: Optional[str] = None
-    beneficiary_name_en: Optional[str] = None
-    pregnancy_month: Optional[int] = Field(None, ge=1, le=10)
-    bp_systolic: Optional[int] = Field(None, ge=50, le=260)
-    bp_diastolic: Optional[int] = Field(None, ge=30, le=180)
-    hb: Optional[float] = Field(None, ge=2, le=20, description="Haemoglobin g/dL")
-    weight_kg: Optional[float] = Field(None, ge=25, le=150)
-    temperature_f: Optional[float] = Field(None, ge=90, le=110)
+    beneficiary_id: int | None = None
+    beneficiary_name: str | None = None
+    beneficiary_name_en: str | None = None
+    pregnancy_month: int | None = Field(None, ge=1, le=10)
+    bp_systolic: int | None = Field(None, ge=50, le=260)
+    bp_diastolic: int | None = Field(None, ge=30, le=180)
+    hb: float | None = Field(None, ge=2, le=20, description="Haemoglobin g/dL")
+    weight_kg: float | None = Field(None, ge=25, le=150)
+    temperature_f: float | None = Field(None, ge=90, le=110)
     symptoms: list[str] = Field(default_factory=list)
-    fetal_movement: Optional[Literal["normal", "reduced"]] = None
-    ifa_taking: Optional[bool] = None
-    ifa_tablets: Optional[int] = Field(None, ge=0, le=400)
-    td_dose: Optional[int] = Field(None, ge=1, le=3, description="1, 2 or 3 (=booster)")
-    vaccine_given: Optional[bool] = None
-    next_visit_date: Optional[date] = None
+    fetal_movement: Literal["normal", "reduced"] | None = None
+    ifa_taking: bool | None = None
+    ifa_tablets: int | None = Field(None, ge=0, le=400)
+    td_dose: int | None = Field(None, ge=1, le=3, description="1, 2 or 3 (=booster)")
+    vaccine_given: bool | None = None
+    next_visit_date: date | None = None
 
 
 class Alert(BaseModel):
@@ -70,7 +70,7 @@ class Analysis(BaseModel):
     summary_en: str  # English read-back, ends with the yes/no question
     gloss_en: str  # English gloss of the extracted visit (no question) for the transcript card
     engine: Literal["rules", "gemini+rules"] = "rules"
-    engine_note: Optional[str] = None
+    engine_note: str | None = None
 
 
 class VisitCreate(BaseModel):

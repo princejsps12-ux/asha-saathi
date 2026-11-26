@@ -1,0 +1,10 @@
+line-length = 120
+target-version = "py312"
+
+[lint]
+# pyflakes, pycodestyle, isort, bugbear, pyupgrade, simplify, naming
+select = ["F", "E", "W", "I", "B", "UP", "SIM", "N"]
+
+[lint.flake8-bugbear]
+# FastAPI's documented dependency-injection pattern, not a mutable default.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.File"]

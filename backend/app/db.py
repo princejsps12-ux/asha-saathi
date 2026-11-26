@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
-from typing import Iterator, Optional
 
 from .parser import KnownBeneficiary
 from .schemas import Alert, VisitFields
@@ -58,7 +58,7 @@ class Database:
             if "is_demo" not in columns:  # migrate DBs created by an earlier version
                 conn.execute("ALTER TABLE visits ADD COLUMN is_demo INTEGER NOT NULL DEFAULT 0")
 
-    def get_meta(self, key: str) -> Optional[str]:
+    def get_meta(self, key: str) -> str | None:
         with self.connect() as conn:
             row = conn.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
         return row["value"] if row else None
@@ -88,7 +88,7 @@ class Database:
 
     # ----------------------------------------------------------- beneficiaries
     def add_beneficiary(self, name_hi: str, name_en: str, village: str, village_en: str = "",
-                        husband_hi: str = "", age: Optional[int] = None) -> int:
+                        husband_hi: str = "", age: int | None = None) -> int:
         with self.connect() as conn:
             cur = conn.execute(
                 "INSERT INTO beneficiaries (name_hi, name_en, husband_hi, village, village_en, age) "
@@ -109,7 +109,7 @@ class Database:
             rows = conn.execute(f"{_LIST_SQL} {where} ORDER BY b.name_en", params).fetchall()
         return [_beneficiary_row(r) for r in rows]
 
-    def get_beneficiary(self, beneficiary_id: int) -> Optional[dict]:
+    def get_beneficiary(self, beneficiary_id: int) -> dict | None:
         rows = self.list_beneficiaries("WHERE b.id = ?", (beneficiary_id,))
         if not rows:
             return None
@@ -145,7 +145,7 @@ class Database:
                                 (beneficiary_id,)).fetchall()
         return [_visit_row(r) for r in rows]
 
-    def get_visit(self, visit_id: int) -> Optional[dict]:
+    def get_visit(self, visit_id: int) -> dict | None:
         with self.connect() as conn:
             row = conn.execute("SELECT * FROM visits WHERE id = ?", (visit_id,)).fetchone()
         return _visit_row(row) if row else None

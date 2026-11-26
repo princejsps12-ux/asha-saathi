@@ -48,7 +48,7 @@ _ROMAN_1_99 = (
 assert len(_DEVANAGARI_1_99) == 99 and len(_ROMAN_1_99) == 99
 
 NUMBER_WORDS: dict[str, int] = {}
-for _i, (_dev, _rom) in enumerate(zip(_DEVANAGARI_1_99, _ROMAN_1_99), start=1):
+for _i, (_dev, _rom) in enumerate(zip(_DEVANAGARI_1_99, _ROMAN_1_99, strict=False), start=1):
     NUMBER_WORDS[_dev] = _i
     NUMBER_WORDS[_rom] = _i
 

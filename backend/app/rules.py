@@ -16,8 +16,8 @@ by the district's medical officer before field deployment.
 """
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Optional
 
 from .schemas import Alert, VisitFields
 
@@ -55,7 +55,7 @@ class Rule:
     title_en: str
     action: tuple[str, str]  # (Hindi, English)
     source: str
-    check: Callable[[VisitFields], Optional[Why]]  # returns WHY (en, hi) when fired
+    check: Callable[[VisitFields], Why | None]  # returns WHY (en, hi) when fired
 
 
 def _has(f: VisitFields, *codes: str) -> bool:
@@ -66,14 +66,14 @@ def _bp(f: VisitFields) -> str:
     return f"{f.bp_systolic or '?'}/{f.bp_diastolic or '?'}"
 
 
-def _severe_htn(f: VisitFields) -> Optional[Why]:
+def _severe_htn(f: VisitFields) -> Why | None:
     if (f.bp_systolic or 0) >= BP_SEVERE_SYSTOLIC or (f.bp_diastolic or 0) >= BP_SEVERE_DIASTOLIC:
         limit = f"{BP_SEVERE_SYSTOLIC}/{BP_SEVERE_DIASTOLIC}"
         return f"BP {_bp(f)} mmHg ≥ {limit}", f"बीपी {_bp(f)} — सीमा {limit} या ज़्यादा"
     return None
 
 
-def _htn(f: VisitFields) -> Optional[Why]:
+def _htn(f: VisitFields) -> Why | None:
     if _severe_htn(f):
         return None  # reported by the severe rule instead
     if (f.bp_systolic or 0) >= BP_HIGH_SYSTOLIC or (f.bp_diastolic or 0) >= BP_HIGH_DIASTOLIC:
@@ -82,38 +82,38 @@ def _htn(f: VisitFields) -> Optional[Why]:
     return None
 
 
-def _preeclampsia(f: VisitFields) -> Optional[Why]:
+def _preeclampsia(f: VisitFields) -> Why | None:
     if _has(f, "swelling", "swelling_face_hands") and _has(f, "headache", "blurred_vision"):
         return ("Swelling + headache/blurred vision together (pre-eclampsia warning)",
                 "सूजन के साथ सिर दर्द / धुंधला दिखना")
     return None
 
 
-def _face_swelling(f: VisitFields) -> Optional[Why]:
+def _face_swelling(f: VisitFields) -> Why | None:
     if _has(f, "swelling_face_hands") and not _preeclampsia(f):
         return "Swelling of face/hands reported", "चेहरे / हाथों पर सूजन बताई गई"
     return None
 
 
-def _headache_vision(f: VisitFields) -> Optional[Why]:
+def _headache_vision(f: VisitFields) -> Why | None:
     if _has(f, "headache") and _has(f, "blurred_vision") and not _preeclampsia(f):
         return "Severe headache with blurred vision", "सिर दर्द के साथ धुंधला दिखना"
     return None
 
 
-def _convulsions(f: VisitFields) -> Optional[Why]:
+def _convulsions(f: VisitFields) -> Why | None:
     if _has(f, "convulsions"):
         return "Convulsions / fits reported (possible eclampsia)", "दौरे / झटके बताए गए"
     return None
 
 
-def _bleeding(f: VisitFields) -> Optional[Why]:
+def _bleeding(f: VisitFields) -> Why | None:
     if _has(f, "bleeding"):
         return "Vaginal bleeding reported — any bleeding in pregnancy", "गर्भावस्था में खून आना"
     return None
 
 
-def _fetal_movement(f: VisitFields) -> Optional[Why]:
+def _fetal_movement(f: VisitFields) -> Why | None:
     if f.fetal_movement != "reduced":
         return None
     if f.pregnancy_month is not None and f.pregnancy_month < FETAL_MOVEMENT_FROM_MONTH:
@@ -124,7 +124,7 @@ def _fetal_movement(f: VisitFields) -> Optional[Why]:
             f"बच्चे की हलचल कम / नहीं ({month_hi}; {FETAL_MOVEMENT_FROM_MONTH}वें महीने से हलचल होनी चाहिए)")
 
 
-def _severe_anaemia(f: VisitFields) -> Optional[Why]:
+def _severe_anaemia(f: VisitFields) -> Why | None:
     if f.hb is not None and f.hb < HB_SEVERE_ANAEMIA:
         return f"Hb {f.hb} g/dL < {HB_SEVERE_ANAEMIA}", f"हीमोग्लोबिन {f.hb} — {HB_SEVERE_ANAEMIA} से कम"
     if _has(f, "breathlessness"):
@@ -132,7 +132,7 @@ def _severe_anaemia(f: VisitFields) -> Optional[Why]:
     return None
 
 
-def _anaemia(f: VisitFields) -> Optional[Why]:
+def _anaemia(f: VisitFields) -> Why | None:
     if f.hb is not None and HB_SEVERE_ANAEMIA <= f.hb < HB_ANAEMIA:
         return f"Hb {f.hb} g/dL < {HB_ANAEMIA}", f"हीमोग्लोबिन {f.hb} — {HB_ANAEMIA} से कम"
     if f.hb is None and _has(f, "pallor_weakness") and not _severe_anaemia(f):
@@ -141,40 +141,40 @@ def _anaemia(f: VisitFields) -> Optional[Why]:
     return None
 
 
-def _abdominal_pain(f: VisitFields) -> Optional[Why]:
+def _abdominal_pain(f: VisitFields) -> Why | None:
     # Over-alerting is deliberate: an ASHA cannot grade pain severity at home.
     if _has(f, "abdominal_pain"):
         return "Abdominal pain reported — needs examination", "पेट में दर्द — जाँच ज़रूरी"
     return None
 
 
-def _high_fever(f: VisitFields) -> Optional[Why]:
+def _high_fever(f: VisitFields) -> Why | None:
     if f.temperature_f is not None and f.temperature_f >= FEVER_F:
         return (f"Temperature {f.temperature_f} °F ≥ {FEVER_F} °F",
                 f"तापमान {f.temperature_f} °F — {FEVER_F} °F या ज़्यादा")
     return None
 
 
-def _fever_reported(f: VisitFields) -> Optional[Why]:
+def _fever_reported(f: VisitFields) -> Why | None:
     if _has(f, "fever") and f.temperature_f is None:
         return "Fever reported, temperature not measured", "बुखार बताया, तापमान नहीं नापा"
     return None
 
 
-def _no_ifa(f: VisitFields) -> Optional[Why]:
+def _no_ifa(f: VisitFields) -> Why | None:
     if f.ifa_taking is False and (f.pregnancy_month or IFA_START_MONTH) >= IFA_START_MONTH:
         return (f"Not taking IFA tablets (180 tablets advised from month {IFA_START_MONTH})",
                 f"आयरन की गोली नहीं ले रही ({IFA_START_MONTH}वें महीने से 180 गोली ज़रूरी)")
     return None
 
 
-def _swelling_only(f: VisitFields) -> Optional[Why]:
+def _swelling_only(f: VisitFields) -> Why | None:
     if _has(f, "swelling") and not (_preeclampsia(f) or _has(f, "swelling_face_hands")):
         return "Swelling of feet — check BP and urine albumin", "पैरों में सूजन — बीपी और पेशाब की जाँच करें"
     return None
 
 
-def _headache_only(f: VisitFields) -> Optional[Why]:
+def _headache_only(f: VisitFields) -> Why | None:
     if _has(f, "headache") and not (_preeclampsia(f) or _headache_vision(f)):
         return "Headache reported — check BP", "सिर दर्द — बीपी जाँचें"
     return None

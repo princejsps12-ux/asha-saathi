@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { api } from '../api.js'
+import { api, toUiError } from '../api.js'
 import { formatDate } from '../i18n.js'
 import { RISK_ICON } from '../labels.js'
 import { Bi } from '../lang.jsx'
 import AlertList from './AlertList.jsx'
+import { ErrorNote } from './Feedback.jsx'
 
 export function RiskChip({ risk }) {
   return (
@@ -54,9 +55,9 @@ export function PeopleList({ people, today, onOpen, emptyKey, showAlerts = false
 
 export function DueView({ version, today, onOpen }) {
   const [due, setDue] = useState(null)
-  const [error, setError] = useState('')
-  useEffect(() => { api.due().then(setDue).catch((e) => setError(e.message)) }, [version])
-  if (error) return <p className="error">{error}</p>
+  const [error, setError] = useState(null)
+  useEffect(() => { api.due().then(setDue).catch((e) => setError(toUiError(e))) }, [version])
+  if (error) return <ErrorNote error={error} />
   return (
     <div className="stack">
       <h2><Bi k="dueTomorrow" inline /> <span className="en">{due && <DateBi iso={due.tomorrow_date} inline />}</span></h2>
@@ -75,9 +76,9 @@ export function DueView({ version, today, onOpen }) {
 
 export function HighRiskView({ version, today, onOpen }) {
   const [people, setPeople] = useState(null)
-  const [error, setError] = useState('')
-  useEffect(() => { api.highRisk().then(setPeople).catch((e) => setError(e.message)) }, [version])
-  if (error) return <p className="error">{error}</p>
+  const [error, setError] = useState(null)
+  useEffect(() => { api.highRisk().then(setPeople).catch((e) => setError(toUiError(e))) }, [version])
+  if (error) return <ErrorNote error={error} />
   return (
     <div className="stack">
       <h2><Bi k="highRiskTitle" inline /> <span className="en">(<Bi k="highRiskSub" inline />)</span></h2>
@@ -88,9 +89,9 @@ export function HighRiskView({ version, today, onOpen }) {
 
 export function PersonDetail({ id, today, version, onBack, onRecord }) {
   const [person, setPerson] = useState(null)
-  const [error, setError] = useState('')
-  useEffect(() => { api.beneficiary(id).then(setPerson).catch((e) => setError(e.message)) }, [id, version])
-  if (error) return <p className="error">{error}</p>
+  const [error, setError] = useState(null)
+  useEffect(() => { api.beneficiary(id).then(setPerson).catch((e) => setError(toUiError(e))) }, [id, version])
+  if (error) return <ErrorNote error={error} />
   if (!person) return <p className="muted center"><Bi k="loading" /></p>
   return (
     <div className="stack">

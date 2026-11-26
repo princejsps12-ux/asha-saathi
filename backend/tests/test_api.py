@@ -145,3 +145,22 @@ def test_english_spoken_visit_end_to_end(client):
     codes = {a["code"] for a in res["alerts"]}
     assert {"hypertension", "reduced_fetal_movement", "bleeding"} <= codes
     assert "Geeta Yadav" in res["gloss_en"]
+
+
+def test_errors_are_bilingual_and_friendly(client):
+    bad = client.post("/api/evaluate", json={"fields": {"bp_systolic": 999}})
+    assert bad.status_code == 422
+    body = bad.json()
+    assert "/" in body["detail"] and "please check" in body["detail"] and body["fields"] == ["fields.bp_systolic"]
+    missing = client.get("/api/beneficiaries/999").json()["detail"]
+    assert "लाभार्थी नहीं मिला" in missing and "Beneficiary not found" in missing
+    no_woman = client.post("/api/visits", json={"fields": {"hb": 9}}).json()["detail"]
+    assert "पहले लाभार्थी चुनें" in no_woman
+
+
+def test_unexpected_error_returns_friendly_500_not_a_stack_trace(tmp_path, monkeypatch):
+    app = create_app(make_settings(tmp_path))
+    monkeypatch.setattr(app.state.db, "list_beneficiaries", lambda *a, **k: 1 / 0)
+    res = TestClient(app, raise_server_exceptions=False).get("/api/beneficiaries")
+    assert res.status_code == 500 and "Something went wrong" in res.json()["detail"]
+    assert "ZeroDivision" not in res.text

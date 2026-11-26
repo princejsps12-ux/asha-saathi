@@ -62,3 +62,17 @@ Resume rule: if work is interrupted, read this file first and continue from the 
 - [x] Backend: alerts carry Hindi + English reason and action; English read-back + gloss (`summary_en`, `gloss_en`)
 - [x] Tests: 116 pytest (bilingual output, English spoken visit, yes/no in Devanagari) + 16 vitest (modes, default, persistence, key parity); vitest runs in the Docker build
 - [x] README demo steps updated with the toggle
+
+## Final quality pass (2026-11-27)
+| Area | Result | Evidence |
+|---|---|---|
+| Fresh clone, one `docker compose up`, no keys | ✅ | Fresh-clone run below; offline-mode badge; no `.env` needed |
+| Zero-typing voice flow + Try sample | ✅ | Mic → read-back → "haan" → save; tap-buttons for corrections; sample verified in browser |
+| Parser (Hindi, Hinglish, English, number words, BP, dates) | ✅ | `test_corpus.py`: 35 realistic sentences; fixed "30 आयरन की गोलियां", "साढ़े सात महीने", "sooj gaya" |
+| Danger rules cited, show WHY, no magic numbers | ✅ | All thresholds are named constants in `rules.py` with [SBA]/[MCP]/[AMB]/[PMSMA]/[ASHA] citations; WHY in Hindi + English |
+| Clean code, linted | ✅ | `ruff check` + ESLint `--max-warnings 0` enforced in the Docker build; unused i18n keys removed; vulture scan clean (only framework false positives) |
+| Tests in Docker | ✅ | 154 pytest (parser, corpus, rules, API, errors) + 16 vitest (language toggle) |
+| Friendly bilingual errors, never crash | ✅ | Bilingual API errors + validation handler; UI maps every failure to an i18n key; React ErrorBoundary |
+| Bilingual default UI, judge-readable in 5 s, mobile | ✅ | Default हिं + EN; 3-step intro card with "no mic? Try sample"; 375 px layout checked |
+| README complete | ✅ | Demo with toggle, architecture, offline/key modes, fallbacks, rules table, tests, lint, error handling |
+| No secrets, `.env.example` | ✅ | Secret scan of tracked files clean |

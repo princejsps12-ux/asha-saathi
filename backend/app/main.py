@@ -4,9 +4,9 @@ from __future__ import annotations
 import logging
 from datetime import timedelta
 from pathlib import Path
-from typing import Optional
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -15,16 +15,25 @@ from .db import Database
 from .integrations import IntegrationError, gemini_extract, merge_fields, sarvam_transcribe
 from .parser import classify_confirmation, parse_visit
 from .rules import evaluate, risk_level
-from .schemas import (SYMPTOM_LABELS, Analysis, EvaluateRequest, ExtractRequest, IntentRequest,
-                      VisitCreate, VisitFields)
+from .schemas import SYMPTOM_LABELS, Analysis, EvaluateRequest, ExtractRequest, IntentRequest, VisitCreate, VisitFields
 from .seed import SAMPLES, refresh_stale_demo, seed
 from .summary import build_gloss_en, build_summary, build_summary_en
 
 log = logging.getLogger("asha")
 MAX_AUDIO_BYTES = 10 * 1024 * 1024  # ~10 MB is several minutes of compressed speech
 
+# Every error the UI can see is bilingual ("Hindi / English") and says what to do next.
+MSG_NOT_FOUND = "लाभार्थी नहीं मिला / Beneficiary not found"
+MSG_INVALID = "कुछ जानकारी सही नहीं लगती, जाँचकर दोबारा डालें / Some values look wrong — please check them"
+MSG_INTERNAL = "कुछ गड़बड़ हुई, दोबारा कोशिश करें / Something went wrong — please try again"
+MSG_SELECT_FIRST = "पहले लाभार्थी चुनें / Select a beneficiary before saving"
+MSG_NO_SARVAM = ("ऑनलाइन आवाज़ सेवा चालू नहीं, ब्राउज़र आवाज़ पहचान इस्तेमाल करें / "
+                 "SARVAM_API_KEY not set — use browser speech recognition")
+MSG_BAD_AUDIO = "रिकॉर्डिंग खाली या बहुत लंबी है / Audio missing or too large"
+MSG_STT_FAILED = "ऑनलाइन आवाज़ सेवा नहीं चली / Online speech service failed"
 
-def create_app(settings: Optional[Settings] = None) -> FastAPI:
+
+def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     db = Database(settings.db_path)
     refresh_stale_demo(db, settings.today())
@@ -36,11 +45,11 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def get_db() -> Database:
         return app.state.db
 
-    def analyse(fields: VisitFields, engine: str = "rules", note: Optional[str] = None) -> Analysis:
+    def analyse(fields: VisitFields, engine: str = "rules", note: str | None = None) -> Analysis:
         if fields.beneficiary_id is not None:
             person = db.get_beneficiary(fields.beneficiary_id)
             if person is None:
-                raise HTTPException(404, "Beneficiary not found")
+                raise HTTPException(404, MSG_NOT_FOUND)
             fields.beneficiary_name, fields.beneficiary_name_en = person["name_hi"], person["name_en"]
         else:  # never show a stale name for an unselected woman
             fields.beneficiary_name = fields.beneficiary_name_en = None
@@ -54,7 +63,12 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     @app.exception_handler(Exception)
     async def unhandled(_: Request, exc: Exception) -> JSONResponse:  # never leak a stack trace to the UI
         log.exception("Unhandled error: %s", exc)
-        return JSONResponse({"detail": "Internal error — please try again"}, status_code=500)
+        return JSONResponse({"detail": MSG_INTERNAL}, status_code=500)
+
+    @app.exception_handler(RequestValidationError)
+    async def invalid(_: Request, exc: RequestValidationError) -> JSONResponse:
+        fields = [".".join(str(p) for p in e["loc"][1:]) for e in exc.errors()]
+        return JSONResponse({"detail": MSG_INVALID, "fields": fields}, status_code=422)
 
     # ---------------------------------------------------------------- meta
     @app.get("/api/health")
@@ -104,22 +118,22 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     @app.post("/api/stt")
     async def stt(audio: UploadFile = File(...)) -> dict:
         if not settings.sarvam_enabled:
-            raise HTTPException(503, "SARVAM_API_KEY not set — use browser speech recognition")
+            raise HTTPException(503, MSG_NO_SARVAM)
         data = await audio.read(MAX_AUDIO_BYTES + 1)  # bounded read: never buffer a huge upload
         if not data or len(data) > MAX_AUDIO_BYTES:
-            raise HTTPException(413 if data else 400, "Audio missing or too large")
+            raise HTTPException(413 if data else 400, MSG_BAD_AUDIO)
         try:
             text = sarvam_transcribe(data, audio.filename or "visit.webm",
                                      audio.content_type or "audio/webm", settings)
         except IntegrationError as exc:
-            raise HTTPException(502, str(exc)) from exc
+            raise HTTPException(502, f"{MSG_STT_FAILED} ({exc})") from exc
         return {"transcript": text}
 
     # -------------------------------------------------------------- records
     @app.post("/api/visits", status_code=201)
     def create_visit(req: VisitCreate, store: Database = Depends(get_db)) -> dict:
         if req.fields.beneficiary_id is None:
-            raise HTTPException(422, "Select a beneficiary before saving / पहले लाभार्थी चुनें")
+            raise HTTPException(422, MSG_SELECT_FIRST)
         result = analyse(req.fields)  # alerts recomputed server-side, never trusted from client
         visit_id = store.add_visit(req.fields.beneficiary_id, settings.today(), req.transcript,
                                    result.fields, result.alerts, result.risk)
@@ -133,7 +147,7 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
     def beneficiary(beneficiary_id: int, store: Database = Depends(get_db)) -> dict:
         person = store.get_beneficiary(beneficiary_id)
         if person is None:
-            raise HTTPException(404, "Beneficiary not found")
+            raise HTTPException(404, MSG_NOT_FOUND)
         return person
 
     @app.get("/api/due")
@@ -171,7 +185,7 @@ def _mount_frontend(app: FastAPI, static_dir: Path) -> None:
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str) -> FileResponse:
         if path.startswith("api/"):
-            raise HTTPException(404, "Not found")
+            raise HTTPException(404, "नहीं मिला / Not found")
         candidate = (static_dir / path).resolve()
         if path and candidate.is_file() and static_dir.resolve() in candidate.parents:
             return FileResponse(candidate)

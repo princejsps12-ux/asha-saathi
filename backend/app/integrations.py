@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import date
-from typing import Any, Optional
+from typing import Any
 
 import httpx
 from pydantic import ValidationError
@@ -104,7 +104,7 @@ def gemini_extract(transcript: str, people: list[KnownBeneficiary], today: date,
     return _clean_llm_fields(raw, {p.id for p in people})
 
 
-def merge_fields(parsed: VisitFields, llm: Optional[dict[str, Any]]) -> VisitFields:
+def merge_fields(parsed: VisitFields, llm: dict[str, Any] | None) -> VisitFields:
     """LLM values win where present; the rule-based parse fills every gap."""
     if not llm:
         return parsed

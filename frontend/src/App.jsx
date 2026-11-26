@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { api } from './api.js'
+import { api, toUiError } from './api.js'
 import { loadMode, mainLang, saveMode } from './i18n.js'
 import { Bi, LangContext, LangToggle, useI18n } from './lang.jsx'
+import { ErrorBoundary, ErrorNote } from './components/Feedback.jsx'
 import RecordView from './components/RecordView.jsx'
 import { DueView, HighRiskView, PeopleList, PersonDetail } from './components/Lists.jsx'
 
@@ -16,7 +17,7 @@ function StatusBadges({ status }) {
   const { plain } = useI18n()
   if (!status) return null
   if (status.offline_mode) {
-    return <span className="badge badge-offline" title={plain('offlineTitle')}><Bi k="offlineBadge" /></span>
+    return <span className="badge badge-offline" title={plain('offlineTitle')}>🔌 <Bi k="offlineBadge" /></span>
   }
   return (
     <span className="badge badge-online">
@@ -35,7 +36,9 @@ export default function App() {
 
   return (
     <LangContext.Provider value={langValue}>
-      <Shell />
+      <ErrorBoundary>
+        <Shell />
+      </ErrorBoundary>
     </LangContext.Provider>
   )
 }
@@ -51,17 +54,17 @@ function Shell() {
   const [openId, setOpenId] = useState(null)
   const [preset, setPreset] = useState(null)
   const [version, setVersion] = useState(0)
-  const [fatal, setFatal] = useState('')
+  const [fatal, setFatal] = useState(null)
 
   useEffect(() => {
     Promise.all([api.status(), api.samples(), api.symptoms()])
       .then(([s, sm, sy]) => { setStatus(s); setSamples(sm); setSymptomLabels(sy) })
-      .catch((e) => setFatal(e.message))
+      .catch((e) => setFatal(toUiError(e)))
   }, [])
 
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
   useEffect(() => {
-    api.beneficiaries().then(setPeople).catch((e) => setFatal(e.message))
+    api.beneficiaries().then(setPeople).catch((e) => setFatal(toUiError(e)))
     Promise.all([api.due(), api.highRisk()])
       .then(([d, r]) => setCounts({ due: d.tomorrow.length, risk: r.filter((p) => p.risk === 'red').length }))
       .catch(() => {})
@@ -71,7 +74,7 @@ function Shell() {
   const recordFor = (id) => { setPreset(id); setOpenId(null); setTab('record') }
   const resetDemo = async () => {
     if (!window.confirm(plain('resetConfirm'))) return
-    await api.resetDemo().catch((e) => setFatal(e.message))
+    await api.resetDemo().catch((e) => setFatal(toUiError(e)))
     setOpenId(null); refresh()
   }
 
@@ -84,7 +87,7 @@ function Shell() {
           <img src="/favicon.svg" alt="" width="36" height="36" />
           <div>
             <h1>आशा साथी</h1>
-            <small>ASHA Saathi · <Bi k="tagline" inline /></small>
+            <small><Bi k="tagline" /></small>
           </div>
         </div>
         <div className="topbar-right">
@@ -94,7 +97,7 @@ function Shell() {
       </header>
 
       <main className="content">
-        {fatal && <p className="error">{fatal}</p>}
+        <ErrorNote error={fatal} />
         {tab === 'record' && (
           <>
             {presetPerson && (
