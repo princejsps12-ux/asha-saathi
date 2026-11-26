@@ -109,4 +109,4 @@ Every threshold and danger sign in `rules.py` was checked against the actual gov
 - [x] Tests updated/added (trimester Hb, BP boundaries, fever boundary, Box 7 levels, every rule cites [TAG] p.N with a URL) → 208 pytest pass in Docker
 
 ## IN PROGRESS — live deploy
-No HF/Render/Fly CLIs or tokens on this machine. Plan: Render "New Web Service → public Git repo → Docker → Free" via the user's browser login, or Hugging Face Spaces (Docker, `app_port`). First make the Dockerfile HEALTHCHECK use `$PORT` (Render sets PORT). Then put the live link at the top of the README, run Try sample on it, and notify.
+Waiting for the user to sign in to Render (dashboard.render.com, GitHub login) in Chrome. Not logged in to Hugging Face either. Plan: Render "New Web Service → public Git repo → Docker → Free" via the user's browser login, or Hugging Face Spaces (Docker, `app_port`). First make the Dockerfile HEALTHCHECK use `$PORT` (Render sets PORT). Then put the live link at the top of the README, run Try sample on it, and notify.
