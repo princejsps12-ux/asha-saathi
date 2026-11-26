@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from .config import Settings, get_settings
 from .db import Database
 from .integrations import IntegrationError, gemini_extract, merge_fields, sarvam_transcribe
-from .parser import classify_confirmation, parse_visit
+from .parser import classify_confirmation, merge_correction, parse_visit, unclear_fields
 from .rules import evaluate, risk_level
 from .schemas import SYMPTOM_LABELS, Analysis, EvaluateRequest, ExtractRequest, IntentRequest, VisitCreate, VisitFields
 from .seed import SAMPLES, refresh_stale_demo, seed
@@ -45,7 +45,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def get_db() -> Database:
         return app.state.db
 
-    def analyse(fields: VisitFields, engine: str = "rules", note: str | None = None) -> Analysis:
+    def analyse(fields: VisitFields, engine: str = "rules", note: str | None = None,
+                changed: bool = True) -> Analysis:
+        if fields.bp_systolic and fields.bp_diastolic:  # a real reading (e.g. typed in) clears "unclear"
+            fields.bp_unclear, fields.bp_heard = False, None
         if fields.beneficiary_id is not None:
             person = db.get_beneficiary(fields.beneficiary_id)
             if person is None:
@@ -58,7 +61,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return Analysis(fields=fields, alerts=alerts, risk=risk_level(alerts),
                         summary_hi=build_summary(fields, alerts, today),
                         summary_en=build_summary_en(fields, alerts, today),
-                        gloss_en=build_gloss_en(fields, alerts, today), engine=engine, engine_note=note)
+                        gloss_en=build_gloss_en(fields, alerts, today), engine=engine, engine_note=note,
+                        unclear=unclear_fields(fields), changed=changed)
 
     @app.exception_handler(Exception)
     async def unhandled(_: Request, exc: Exception) -> JSONResponse:  # never leak a stack trace to the UI
@@ -99,13 +103,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def extract(req: ExtractRequest, store: Database = Depends(get_db)) -> Analysis:
         people = store.known_people()
         fields = parse_visit(req.transcript, settings.today(), people)
-        if not settings.gemini_enabled:
-            return analyse(fields)
-        try:
-            llm = gemini_extract(req.transcript, people, settings.today(), settings)
-            return analyse(merge_fields(fields, llm), engine="gemini+rules")
-        except IntegrationError as exc:
-            return analyse(fields, note=f"{exc} — used offline parser")
+        engine, note = "rules", None
+        if settings.gemini_enabled:
+            try:
+                fields = merge_fields(fields, gemini_extract(req.transcript, people, settings.today(), settings))
+                engine = "gemini+rules"
+            except IntegrationError as exc:
+                note = f"{exc} — used offline parser"
+        if req.base is None:
+            return analyse(fields, engine=engine, note=note)
+        merged, changed = merge_correction(req.base, fields)  # spoken correction, e.g. "BP 150 by 100"
+        return analyse(merged, engine=engine, note=note, changed=changed)
 
     @app.post("/api/evaluate", response_model=Analysis)
     def evaluate_fields(req: EvaluateRequest) -> Analysis:

@@ -84,15 +84,33 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
       onEnd: async (answer) => {
         if (id !== flow.current) return
         if (!answer) { setPhase('review'); return }
+        // Something was not understood (e.g. BP heard as "15/100"): first treat the answer as
+        // the missing detail — "बीपी 150 बाय 100" — merged into this same entry.
+        const asking = result.unclear?.length > 0
+        if (asking && await applyCorrection(answer, result, id)) return
         const { intent } = await api.intent(answer).catch(() => ({ intent: 'unknown' }))
         if (id !== flow.current) return
-        if (intent === 'yes') save(result)
-        else {
-          setPhase('review')
-          say(t(intent === 'no' ? 'sayEdit' : 'sayUnknown'))
-        }
+        if (intent === 'yes') return save(result)
+        // "nahi, BP 150 by 100" or any other spoken fix also counts as a correction.
+        if (!asking && await applyCorrection(answer, result, id)) return
+        setPhase('review')
+        say(t(intent === 'no' ? 'sayEdit' : 'sayUnknown'))
       },
     })
+  }
+
+  /** Merge a spoken correction into the current entry; true if it changed anything. */
+  async function applyCorrection(answer, result, id) {
+    try {
+      const next = await api.extract(answer, result.fields)
+      if (id !== flow.current || !next.changed) return false
+      setTranscript(`${transcriptRef.current} · ${answer}`)
+      setAnalysis(next)
+      readBackAndConfirm(next)
+      return true
+    } catch {
+      return false // a failed correction just falls through to the normal yes / no handling
+    }
   }
 
   async function save(result = analysis) {
@@ -205,7 +223,8 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
               : <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z" />}
           </svg>
         </button>
-        <Bi k={`phase_${phase}`} className="phase" />
+        <Bi k={phase === 'confirming' && analysis?.unclear?.length ? 'phase_clarify' : `phase_${phase}`}
+          className="phase" />
         {!canListen && <p className="warn"><Bi k="noStt" /></p>}
         <button type="button" className="btn btn-ghost" onClick={trySample} disabled={busy || phase === 'listening'}>
           <Bi k="trySample" />

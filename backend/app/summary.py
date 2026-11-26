@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 
+from .rules import CLARIFY_CODES
 from .schemas import SYMPTOM_LABELS, Alert, VisitFields
 
 HINDI_MONTHS = ("जनवरी", "फ़रवरी", "मार्च", "अप्रैल", "मई", "जून", "जुलाई", "अगस्त", "सितंबर",
@@ -12,6 +13,21 @@ EN_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct
 
 QUESTION_HI = "क्या यह सही है? हाँ या नहीं बोलिए।"
 QUESTION_EN = "Is this correct? Say yes or no."
+# When something was spoken but not understood we ask for it, never guess it.
+BP_UNCLEAR_HI = "बीपी समझ नहीं आया, दोबारा बोलिए"
+BP_UNCLEAR_EN = "BP not clear, please say again"
+MOVEMENT_UNCLEAR_HI = "बच्चे की हलचल साफ़ समझ नहीं आई — कम है या ठीक? दोबारा बताइए"
+MOVEMENT_UNCLEAR_EN = "Baby movement not clear — reduced or normal? Please say again"
+CLARIFY_HI = "अभी दोबारा बोलिए, या 'हाँ' बोलकर ऐसे ही सेव करें।"
+CLARIFY_EN = "Say it again now, or say 'yes' to save it as it is."
+
+
+def _needs_clarifying(f: VisitFields) -> bool:
+    return f.bp_unclear or f.fetal_movement == "unclear"
+
+
+def _risk_alerts(alerts: list[Alert]) -> list[Alert]:
+    return [a for a in alerts if a.code not in CLARIFY_CODES]  # asked for separately
 
 
 def hindi_date(d: date, today: date) -> str:
@@ -32,6 +48,8 @@ def _hindi_parts(f: VisitFields, alerts: list[Alert], today: date) -> list[str]:
         parts.append(f"{f.pregnancy_month} महीने की गर्भवती")
     if f.bp_systolic and f.bp_diastolic:
         parts.append(f"बीपी {f.bp_systolic} बटा {f.bp_diastolic}")
+    elif f.bp_unclear:
+        parts.append(BP_UNCLEAR_HI)
     if f.hb is not None:
         parts.append(f"हीमोग्लोबिन {f.hb:g}")
     if f.weight_kg is not None:
@@ -40,7 +58,9 @@ def _hindi_parts(f: VisitFields, alerts: list[Alert], today: date) -> list[str]:
         parts.append(f"तापमान {f.temperature_f:g} डिग्री")
     if f.symptoms:
         parts.append("लक्षण: " + ", ".join(SYMPTOM_LABELS[s][0] for s in f.symptoms if s in SYMPTOM_LABELS))
-    if f.fetal_movement:
+    if f.fetal_movement == "unclear":
+        parts.append(MOVEMENT_UNCLEAR_HI)
+    elif f.fetal_movement:
         parts.append("बच्चे की हलचल " + ("कम है" if f.fetal_movement == "reduced" else "ठीक है"))
     if f.ifa_taking is not None:
         parts.append("आयरन की गोली " + ("ले रही हैं" if f.ifa_taking else "नहीं ले रही हैं"))
@@ -50,6 +70,7 @@ def _hindi_parts(f: VisitFields, alerts: list[Alert], today: date) -> list[str]:
         parts.append("टीका लगा")
     if f.next_visit_date:
         parts.append(f"अगली विज़िट {hindi_date(f.next_visit_date, today)}")
+    alerts = _risk_alerts(alerts)
     red = [a for a in alerts if a.severity == "red"]
     if red:
         parts.append("खतरे का संकेत: " + ", ".join(a.title_hi for a in red) + "। " + red[0].action_hi)
@@ -64,6 +85,8 @@ def _english_parts(f: VisitFields, alerts: list[Alert], today: date) -> list[str
         parts.append(f"{f.pregnancy_month} months pregnant")
     if f.bp_systolic and f.bp_diastolic:
         parts.append(f"BP {f.bp_systolic}/{f.bp_diastolic}")
+    elif f.bp_unclear:
+        parts.append(BP_UNCLEAR_EN)
     if f.hb is not None:
         parts.append(f"Hb {f.hb:g} g/dL")
     if f.weight_kg is not None:
@@ -75,7 +98,9 @@ def _english_parts(f: VisitFields, alerts: list[Alert], today: date) -> list[str
                                                if s in SYMPTOM_LABELS))
     else:
         parts.append("No symptoms reported")
-    if f.fetal_movement:
+    if f.fetal_movement == "unclear":
+        parts.append(MOVEMENT_UNCLEAR_EN)
+    elif f.fetal_movement:
         parts.append("Baby movement " + ("reduced" if f.fetal_movement == "reduced" else "normal"))
     if f.ifa_taking is not None:
         parts.append("Taking IFA tablets" if f.ifa_taking else "Not taking IFA tablets")
@@ -85,6 +110,7 @@ def _english_parts(f: VisitFields, alerts: list[Alert], today: date) -> list[str
         parts.append("Vaccine given")
     if f.next_visit_date:
         parts.append(f"Next visit {english_date(f.next_visit_date, today)}")
+    alerts = _risk_alerts(alerts)
     red = [a for a in alerts if a.severity == "red"]
     if red:
         parts.append("Danger sign: " + ", ".join(a.title_en for a in red) + ". " + red[0].action_en)
@@ -95,7 +121,8 @@ def _english_parts(f: VisitFields, alerts: list[Alert], today: date) -> list[str
 
 def build_summary(f: VisitFields, alerts: list[Alert], today: date) -> str:
     """Hindi read-back, ending with the yes/no question."""
-    return "। ".join(_hindi_parts(f, alerts, today)) + "। " + QUESTION_HI
+    question = CLARIFY_HI if _needs_clarifying(f) else QUESTION_HI
+    return "। ".join(_hindi_parts(f, alerts, today)) + "। " + question
 
 
 def build_gloss_en(f: VisitFields, alerts: list[Alert], today: date) -> str:
@@ -105,4 +132,5 @@ def build_gloss_en(f: VisitFields, alerts: list[Alert], today: date) -> str:
 
 def build_summary_en(f: VisitFields, alerts: list[Alert], today: date) -> str:
     """English read-back, ending with the yes/no question."""
-    return build_gloss_en(f, alerts, today) + " " + QUESTION_EN
+    question = CLARIFY_EN if _needs_clarifying(f) else QUESTION_EN
+    return build_gloss_en(f, alerts, today) + " " + question

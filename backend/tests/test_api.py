@@ -164,3 +164,30 @@ def test_unexpected_error_returns_friendly_500_not_a_stack_trace(tmp_path, monke
     res = TestClient(app, raise_server_exceptions=False).get("/api/beneficiaries")
     assert res.status_code == 500 and "Something went wrong" in res.json()["detail"]
     assert "ZeroDivision" not in res.text
+
+
+def test_misheard_bp_is_asked_again_then_corrected_by_voice(client):
+    from tests.test_stt_mishearings import REAL_STT
+    first = client.post("/api/extract", json={"transcript": REAL_STT}).json()
+    assert first["unclear"] == ["bp"] and first["fields"]["bp_heard"] == "15/100"
+    assert first["fields"]["bp_systolic"] is None and first["fields"]["fetal_movement"] == "reduced"
+    assert "बीपी समझ नहीं आया, दोबारा बोलिए" in first["summary_hi"]
+    assert "BP not clear, please say again" in first["summary_en"]
+
+    # She says just the BP again: it is merged into the same entry.
+    fixed = client.post("/api/extract", json={"transcript": "बीपी 150 बाय 100", "base": first["fields"]}).json()
+    assert fixed["changed"] is True and fixed["unclear"] == []
+    assert (fixed["fields"]["bp_systolic"], fixed["fields"]["bp_diastolic"]) == (150, 100)
+    assert fixed["fields"]["beneficiary_id"] == first["fields"]["beneficiary_id"]
+    assert {"hypertension", "reduced_fetal_movement"} <= {a["code"] for a in fixed["alerts"]}
+    assert "क्या यह सही है" in fixed["summary_hi"]  # nothing unclear any more: plain yes/no
+
+    # A plain "haan" adds nothing, so the UI treats it as a yes instead.
+    same = client.post("/api/extract", json={"transcript": "हाँ", "base": fixed["fields"]}).json()
+    assert same["changed"] is False
+
+
+def test_typed_bp_clears_unclear_flag(client):
+    res = client.post("/api/evaluate", json={"fields": {"bp_unclear": True, "bp_heard": "15/100",
+                                                         "bp_systolic": 150, "bp_diastolic": 100}}).json()
+    assert res["fields"]["bp_unclear"] is False and res["unclear"] == []

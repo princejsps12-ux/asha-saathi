@@ -46,7 +46,9 @@ function BpInput({ fields, onCommit }) {
       <input type="number" inputMode="numeric" value={dia} placeholder={plain('bpLower')}
         onChange={(e) => setDia(e.target.value)} />
       <button type="button" className="btn btn-small"
-        onClick={() => onCommit({ bp_systolic: toNum(sys), bp_diastolic: toNum(dia) })}><Bi k="ok" /></button>
+        onClick={() => onCommit({ bp_systolic: toNum(sys), bp_diastolic: toNum(dia), bp_unclear: false, bp_heard: null })}>
+        <Bi k="ok" />
+      </button>
     </div>
   )
 }
@@ -88,7 +90,10 @@ export default function FieldsCard({ fields, people, symptomLabels, today, onCha
     },
     {
       key: 'f_bp',
-      value: fields.bp_systolic && fields.bp_diastolic && plain(`${fields.bp_systolic}/${fields.bp_diastolic}`),
+      // A mis-heard BP is shown as what was heard + "say again" — never as a guessed value.
+      unclear: fields.bp_unclear,
+      value: fields.bp_systolic && fields.bp_diastolic ? plain(`${fields.bp_systolic}/${fields.bp_diastolic}`)
+        : fields.bp_unclear ? both('bpUnclear', { heard: fields.bp_heard || '?' }) : null,
       editor: <BpInput fields={fields} onCommit={set} />,
     },
     {
@@ -119,6 +124,7 @@ export default function FieldsCard({ fields, people, symptomLabels, today, onCha
     },
     {
       key: 'f_fetal',
+      unclear: fields.fetal_movement === 'unclear',
       value: fields.fetal_movement && both(`fetal_${fields.fetal_movement}`),
       editor: <Choice value={fields.fetal_movement}
         options={[['normal', both('fetal_normal')], ['reduced', both('fetal_reduced')], [null, both('unknown')]]}
@@ -161,11 +167,13 @@ export default function FieldsCard({ fields, people, symptomLabels, today, onCha
         {rows.map((row) => {
           const value = row.value || null
           return (
-            <div key={row.key} className={`field ${open === row.key ? 'field-open' : ''}`}>
+            <div key={row.key}
+              className={`field ${open === row.key ? 'field-open' : ''} ${row.unclear ? 'field-unclear' : ''}`}>
               <button type="button" className="field-row" disabled={disabled}
                 onClick={() => setOpen(open === row.key ? null : row.key)}>
                 <dt><Bi k={row.key} always /></dt>
                 <dd className={value ? '' : 'muted'}>
+                  {row.unclear && <span className="unclear-icon" aria-hidden>⚠️</span>}
                   {value ? <Bi hi={value.hi} en={value.en} always />
                     : <Bi k={row.emptyKey || 'tapToAdd'} always />}
                 </dd>

@@ -43,6 +43,10 @@ IFA_START_MONTH = 4
 EMERGENCY = ("तुरंत 108 एम्बुलेंस बुलाएँ / FRU रेफ़र करें", "Call 108 ambulance / refer to FRU now")
 REFER = ("आज ही PHC / मेडिकल ऑफिसर के पास रेफ़र करें", "Refer to PHC / medical officer today")
 WATCH = ("ANM को बताएं, अगली विज़िट में दोबारा जाँचें", "Inform the ANM and recheck at the next visit")
+ASK_AGAIN = ("दोबारा नापें / पूछें और दर्ज करें", "Measure / ask again and record it")
+
+# "Spoken but not understood" alerts: they ask for a value again rather than flag a risk.
+CLARIFY_CODES = frozenset({"bp_unclear", "fetal_movement_unclear"})
 
 Why = tuple[str, str]  # (English reason, Hindi reason) — both include measured values
 
@@ -168,6 +172,24 @@ def _no_ifa(f: VisitFields) -> Why | None:
     return None
 
 
+def _bp_unclear(f: VisitFields) -> Why | None:
+    # Never guess a BP from a mis-heard number: ask for it again.
+    if f.bp_unclear:
+        heard = f" '{f.bp_heard}'" if f.bp_heard else ""
+        return (f"BP heard as{heard} — not a valid reading; re-measure or say it again",
+                f"बीपी{heard} सुना — यह सही रीडिंग नहीं; दोबारा नापें या बोलें")
+    return None
+
+
+def _fetal_movement_unclear(f: VisitFields) -> Why | None:
+    if f.fetal_movement != "unclear":
+        return None
+    if f.pregnancy_month is not None and f.pregnancy_month < FETAL_MOVEMENT_FROM_MONTH:
+        return None
+    return ("Baby movement mentioned but unclear — ask: reduced or normal?",
+            "बच्चे की हलचल साफ़ नहीं — पूछें: कम है या ठीक?")
+
+
 def _swelling_only(f: VisitFields) -> Why | None:
     if _has(f, "swelling") and not (_preeclampsia(f) or _has(f, "swelling_face_hands")):
         return "Swelling of feet — check BP and urine albumin", "पैरों में सूजन — बीपी और पेशाब की जाँच करें"
@@ -207,6 +229,10 @@ RULES: tuple[Rule, ...] = (
     Rule("headache", "amber", "सिर दर्द", "Headache", WATCH, "[SBA] PIH symptom screening", _headache_only),
     Rule("no_ifa", "amber", "आयरन की गोली नहीं ले रही", "Not taking IFA", WATCH,
          "[AMB] 180 IFA tablets in pregnancy", _no_ifa),
+    Rule("bp_unclear", "amber", "बीपी साफ़ नहीं सुना", "BP not clear", ASK_AGAIN,
+         "[SBA] BP must be recorded at every ANC visit", _bp_unclear),
+    Rule("fetal_movement_unclear", "amber", "हलचल साफ़ नहीं", "Baby movement unclear", ASK_AGAIN,
+         "[MCP] reduced fetal movement is a danger sign", _fetal_movement_unclear),
 )
 
 

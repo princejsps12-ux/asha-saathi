@@ -30,11 +30,16 @@ class VisitFields(BaseModel):
     pregnancy_month: int | None = Field(None, ge=1, le=10)
     bp_systolic: int | None = Field(None, ge=50, le=260)
     bp_diastolic: int | None = Field(None, ge=30, le=180)
+    # A BP was spoken but could not be read as a valid pair (e.g. STT gave "15 बाय 100").
+    # Values stay empty — we never guess — and the app asks for the BP again.
+    bp_unclear: bool = False
+    bp_heard: str | None = Field(None, max_length=20, description="What was heard, e.g. '15/100'")
     hb: float | None = Field(None, ge=2, le=20, description="Haemoglobin g/dL")
     weight_kg: float | None = Field(None, ge=25, le=150)
     temperature_f: float | None = Field(None, ge=90, le=110)
     symptoms: list[str] = Field(default_factory=list)
-    fetal_movement: Literal["normal", "reduced"] | None = None
+    # "unclear": movement was mentioned but neither reduced nor normal wording was heard.
+    fetal_movement: Literal["normal", "reduced", "unclear"] | None = None
     ifa_taking: bool | None = None
     ifa_tablets: int | None = Field(None, ge=0, le=400)
     td_dose: int | None = Field(None, ge=1, le=3, description="1, 2 or 3 (=booster)")
@@ -56,6 +61,8 @@ class Alert(BaseModel):
 
 class ExtractRequest(BaseModel):
     transcript: str = Field(..., min_length=1, max_length=4000)
+    # When set, the transcript is a spoken *correction* ("BP 150 by 100") merged into this entry.
+    base: VisitFields | None = None
 
 
 class EvaluateRequest(BaseModel):
@@ -71,6 +78,8 @@ class Analysis(BaseModel):
     gloss_en: str  # English gloss of the extracted visit (no question) for the transcript card
     engine: Literal["rules", "gemini+rules"] = "rules"
     engine_note: str | None = None
+    unclear: list[str] = Field(default_factory=list)  # fields to ask again: "bp", "fetal_movement"
+    changed: bool = True  # for a correction: did it add or change anything?
 
 
 class VisitCreate(BaseModel):

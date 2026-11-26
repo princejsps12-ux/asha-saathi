@@ -260,3 +260,10 @@ h1, h2, h3 { margin: 0; }
 .crash .bi { align-items: center; }
 .badge-offline { display: inline-flex; align-items: center; gap: 6px; }
 .risk-chip.risk-red .bi-sub { color: rgba(255, 255, 255, .88); }
+
+/* Spoken but not understood (e.g. BP heard as "15 बाय 100"): amber, asks to be said again. */
+.field-unclear { background: var(--amber-soft); margin: 0 -16px; padding: 0 16px; border-left: 5px solid var(--saffron); }
+.field-unclear .field-row dd { color: var(--amber); }
+.field-unclear .field-row dd .bi-sub { color: var(--amber); opacity: .85; }
+.field-row dd { display: flex; align-items: flex-start; gap: 6px; }
+.unclear-icon { font-size: 1rem; line-height: 1.3; }

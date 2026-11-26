@@ -76,3 +76,14 @@ Resume rule: if work is interrupted, read this file first and continue from the 
 | Bilingual default UI, judge-readable in 5 s, mobile | ✅ | Default हिं + EN; 3-step intro card with "no mic? Try sample"; 375 px layout checked |
 | README complete | ✅ | Demo with toggle, architecture, offline/key modes, fallbacks, rules table, tests, lint, error handling |
 | No secrets, `.env.example` | ✅ | Secret scan of tracked files clean |
+
+## Real-mic bug fixes (2026-11-27)
+Reported from a real recording; Chrome hi-IN STT gave
+`सुनीता साहू 7 महीने बीपी 15 बाय 100 पैरों में सूजन है बेबी मूवमेंट काम है अगले हफ्ते फिर आऊंगी`.
+- [x] BP "15 बाय 100" was silently dropped → now **BP unclear**: no value guessed, amber field shows "heard 15/100", amber "BP not clear" alert, read-back says "बीपी समझ नहीं आया, दोबारा बोलिए / BP not clear, please say again". Same for dropped zeros, reversed and half-heard BP; dates like 28/11 are not mistaken for BP
+- [x] "बेबी मूवमेंट काम है" was read as NORMAL → काम next to movement words means कम (reduced); movement mentioned with no clear state is **unclear** and asked again, never defaulted to normal
+- [x] Found while fixing: STT has no punctuation, so one "नहीं" could negate every symptom → clauses also end at sentence-final है/hai
+- [x] A bare mention of iron tablets is no longer assumed "taking"
+- [x] Voice correction: after the read-back she can just say "बीपी 150 बाय 100"; it is merged into the same entry and read back again
+- [x] The exact STT sentence is a Try sample ("Real speech-to-text — unclear BP")
+- [x] Tests: `test_stt_mishearings.py` (exact STT text + dropped zeros, काम/कम, सूजन spellings, बाय/बाई/ओवर/upar-neeche, run-on negation, corrections) + API tests → 201 pytest + 16 vitest, all passing in Docker

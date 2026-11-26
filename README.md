@@ -25,7 +25,8 @@ The cost of a late entry is clinical, not clerical. **High BP, bleeding, severe 
 6. Under the Hindi transcript, an **English gloss** of the extracted visit appears (built from the extracted fields, so it works offline). The **read-back summary** card shows the Hindi summary with the English one underneath.
 7. The app **reads the summary aloud** (Hindi in हिं + EN / हिं, English in EN) and listens for **"haan" / "nahi"** (or *yes* / *no*). Say *haan*, or tap **✓ Save**.
 8. Open **📅 कल (Due)**: Rekha now appears in *due tomorrow*. Open **⚠️ Risk**: she is on the high-risk list.
-9. With a mic: tap the big button and say something like
+9. Tap **Try sample** until *Real speech-to-text — unclear BP* comes up. This is the exact text Chrome produced from a real recording, with "150" heard as "15" and कम as काम. The BP field turns amber, nothing is guessed, and the read-back asks for the BP again.
+10. With a mic: tap the big button and say something like
    *"Sunita Sahu, saat mahine, BP 150 by 100, pairon mein sujan hai, baby movement kam hai, agle hafte phir aaungi"*.
 
 If something was misheard, tap that field to fix it. Most fields are big tap-buttons (month 1–9, symptoms, dates like कल/परसों), so even corrections rarely need typing.
@@ -87,7 +88,7 @@ To enable key mode, copy `.env.example` to `.env`, fill in the keys, and run `do
 |---|---|---|
 | Web Speech API (Chrome) | Free | Switch to Sarvam (key), or self-host an open model such as AI4Bharat IndicConformer / Whisper behind the same `/api/stt` endpoint, which the UI already supports |
 | Sarvam STT | Paid, optional | Remove the key: the app reverts to browser STT with no code change |
-| Gemini | Paid, optional | Remove the key: the rule-based parser already handles the full flow and is covered by 150+ tests, including 35 realistic spoken sentences |
+| Gemini | Paid, optional | Remove the key: the rule-based parser already handles the full flow and is covered by 200+ tests, including 35 realistic spoken sentences and real speech-to-text mishearings |
 | FastAPI, React, SQLite | Open source | — |
 
 No feature in the core flow depends on a paid API.
@@ -129,11 +130,13 @@ All thresholds are named constants in [`backend/app/rules.py`](backend/app/rules
 | Field | Examples it handles |
 |---|---|
 | Numbers | `140`, `१४०`, `एक सौ चालीस`, `ek sau chalis`, `साढ़े नौ` → 9.5, `8 point 5`; context-aware (`goli do` ≠ 2) |
-| BP | `140/90`, `140 by 90`, `140 बटा 90`, `बाय`, `upar 140 neeche 90`, `140 upar 90 neeche`, `ऊपर का 130 नीचे का 85` |
+| BP | `140/90`, `140 by 90`, `140 बटा 90`, `बाय`, `बाई`, `ओवर`, `upar 140 neeche 90`, `140 upar 90 neeche`, `ऊपर का 130 नीचे का 85`. **A spoken BP that isn't a valid reading is never guessed and never dropped.** `बीपी 15 बाय 100` (a lost zero), `90 by 140` (reversed) or `बीपी 150` (half missing) becomes **BP unclear**: the field turns amber and shows what was heard, and the read-back says *"बीपी समझ नहीं आया, दोबारा बोलिए / BP not clear, please say again"* |
 | Pregnancy month | `सात महीने`, `7 mahine`, `सातवां महीना`, `7th month`, `28 हफ्ते` → 7; ignores `2 mahine baad` |
 | Symptoms | सूजन/sujan/swelling (face vs feet), सिर दर्द/sar dard, धुंधला, खून आना/bleeding (but *not* खून की कमी or खून की जांच), सांस फूलना, कमजोरी, बुखार, पेट दर्द, झटके |
 | Negation | `सूजन नहीं है`, `koi sujan nahi`, `no bleeding` are ignored, clause by clause |
-| Baby movement | `हलचल कम`, `baby movement kam`, `bachcha hil nahi raha` → reduced; `theek hai`, `कम नहीं` → normal |
+| Baby movement | `हलचल कम`, `baby movement kam`, `bachcha hil nahi raha`, and `बेबी मूवमेंट काम है` (speech engines write काम for कम) → reduced. `theek hai`, `कम नहीं`, `हिल रहा है` → normal. **Mentioned with neither** (`बेबी मूवमेंट`) → **unclear**: amber, asked again in the read-back, never assumed normal |
+| Run-on speech | Browser STT returns no punctuation, so clauses also end at a sentence-final `है`/`hai`. `सूजन नहीं है बुखार है` keeps the fever and drops only the swelling |
+| Saying it again | After a read-back that asks for something, she just says it, e.g. *"बीपी 150 बाय 100"*. The answer is merged into the same entry (`/api/extract` with `base`), then read back again. *"हाँ"* saves as is |
 | IFA | `आयरन की गोली ले रही`, `iron nahi le rahi`, `IFA ki 30 goli di` |
 | Td / TT | `टीडी का दूसरा टीका`, `TT 1`, `pehla teeka`, `booster` |
 | Next visit | `कल`, `परसों`, `अगले हफ्ते`, `5 din baad`, `do hafte baad`, `15 तारीख`, weekday names. A bare `कल` counts only with visit words, because `कल से सिर दर्द` means *since yesterday* |
@@ -167,8 +170,9 @@ Other useful commands:
 
 ## Tests
 
-**154 pytest cases + 16 frontend (vitest) cases**, all run inside Docker. The pytest suite runs with `docker compose run --rm app pytest`. Every `docker compose build` also runs ESLint (`--max-warnings 0`), the vitest suite and `ruff check`; any lint warning or failing test fails the build:
+**201 pytest cases + 16 frontend (vitest) cases**, all run inside Docker. The pytest suite runs with `docker compose run --rm app pytest`. Every `docker compose build` also runs ESLint (`--max-warnings 0`), the vitest suite and `ruff check`; any lint warning or failing test fails the build:
 
+- `tests/test_stt_mishearings.py`: the **exact Chrome hi-IN output** of a real spoken visit (`…बीपी 15 बाय 100 … बेबी मूवमेंट काम है…`) and other common mishearings: dropped zeros, reversed or half-heard BP, काम/कम, सूजन spellings, बाय/बाई/ओवर/upar-neeche, run-on sentences, no false "BP unclear" for dates, and the voice correction merge.
 - `tests/test_corpus.py`: **35 realistic visit notes** as ASHAs actually say them — Hindi, Hinglish, English, Hindi number words (`एक सौ दस बटा सत्तर`, `ek sau bees by assi`, `साढ़े सात महीने`), every BP format, weeks to months, weekdays, `तारीख`, `परसों`, negations. Symptoms are compared as exact sets, so a false alarm fails the test.
 - `tests/test_parser.py`: one block per parser rule. Hindi number words, Devanagari digits, every BP format, months/weeks, symptoms with negation, bleeding vs anaemia vs blood test, fetal movement, IFA, Td, every date phrase, Hb/temperature/weight, name matching, and full Hindi and Hinglish sentences.
 - `tests/test_rules.py`: every danger rule, including boundary values (139/89 vs 140/90, Hb 6.8/7.0/10.9/11.0, month 4 vs 5), alert ordering, and a check that every rule cites a source.
@@ -202,7 +206,7 @@ asha-saathi/
 │   │   ├── seed.py         5 demo beneficiaries + sample sentences
 │   │   ├── main.py         FastAPI routes + bilingual error handling
 │   │   └── serve.py        entrypoint, prints the app URL
-│   └── tests/              154 pytest cases (parser, 35-sentence corpus, rules, API)
+│   └── tests/              201 pytest cases (parser, corpus, STT mishearings, rules, API)
 └── frontend/src/
     ├── i18n.js             हिं + EN / हिं / EN modes, all UI strings, localStorage (+ i18n.test.js)
     ├── lang.jsx            <Bi> two-line label and the language toggle

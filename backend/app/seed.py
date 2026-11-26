@@ -56,6 +56,14 @@ SAMPLES = [
         "text": "Kamla Dhruw, 4 months pregnant, BP 150 upar 100 neeche, some bleeding since morning, "
                 "not taking iron tablets, next visit in 2 days",
     },
+    {
+        # Exact Chrome hi-IN output for a spoken Hinglish note: no punctuation, "150" heard as
+        # "15", "कम" heard as "काम". Shows that a mis-heard BP is asked again, never guessed.
+        "id": "real_stt_unclear",
+        "label_hi": "असली STT — बीपी साफ़ नहीं",
+        "label_en": "Real speech-to-text — unclear BP",
+        "text": "सुनीता साहू 7 महीने बीपी 15 बाय 100 पैरों में सूजन है बेबी मूवमेंट काम है अगले हफ्ते फिर आऊंगी",
+    },
 ]
 
 

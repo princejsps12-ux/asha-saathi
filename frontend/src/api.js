@@ -45,7 +45,8 @@ export const api = {
   beneficiary: (id) => request(`/api/beneficiaries/${id}`),
   due: () => request('/api/due'),
   highRisk: () => request('/api/high-risk'),
-  extract: (transcript) => post('/api/extract', { transcript }),
+  // `base`: the current entry, when the transcript is a spoken correction ("BP 150 by 100")
+  extract: (transcript, base = null) => post('/api/extract', base ? { transcript, base } : { transcript }),
   evaluate: (fields) => post('/api/evaluate', { fields }),
   intent: (text) => post('/api/intent', { text }),
   saveVisit: (transcript, fields) => post('/api/visits', { transcript, fields }),

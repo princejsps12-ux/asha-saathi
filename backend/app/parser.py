@@ -13,6 +13,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from typing import NamedTuple
 
 from .numbers import fold, normalize_numbers
 from .schemas import VisitFields
@@ -56,7 +57,13 @@ def _pattern(*parts: str) -> re.Pattern[str]:
 
 
 NEGATIONS = ("नहीं", "नही", "मत", "nahi", "nahin", "nhi", "nai", "no", "not", "never", "without")
-_CLAUSE_SPLIT = re.compile(r"[,।;!?\n]+|\.(?!\d)|\s(?:और|लेकिन|मगर|aur|lekin|magar|but|and)\s")
+# Browser speech-to-text usually returns NO punctuation, so we also end a clause after a
+# sentence-final verb ("सूजन है | बेबी मूवमेंट कम है"); otherwise one "नहीं" would negate
+# every symptom in the whole visit note.
+_CLAUSE_SPLIT = re.compile(
+    r"[,।;!?\n]+|\.(?!\d)|\s(?:और|लेकिन|मगर|aur|lekin|magar|but|and)\s"
+    r"|(?<=\sहै)\s|(?<=\sहैं)\s|(?<=\sथा)\s|(?<=\sथी)\s|(?<=\shai)\s|(?<=\shain)\s"
+)
 
 
 def split_clauses(text: str) -> list[str]:
@@ -74,7 +81,8 @@ def _preprocess(text: str) -> str:
 
 SYMPTOM_PATTERNS: dict[str, re.Pattern[str]] = {
     # "sujan"/"soojan" (noun) and "sooj gaya"/"suje" (verb: became swollen)
-    "swelling": _pattern(r"सूजन|सुजन|सूज", r"(?<![a-z])(?:s[ou]{1,2}j(?:aa?n|a|e|i)?|swelling|swollen|o?edema)(?![a-z])"),
+    "swelling": _pattern(r"सूजन|सुजन|सूझन|सोजन|सूज",
+                         r"(?<![a-z])(?:s[ou]{1,2}j(?:aa?n|a|e|i)?|swelling|swollen|o?edema)(?![a-z])"),
     "headache": _pattern(r"(?:सिर|सर)\s*(?:में\s*)?(?:बहुत\s*|तेज\s*)?दर्द",
                          r"(?<![a-z])(?:sir|sar)\s*(?:me|mein|main)?\s*(?:bahut\s*|tez\s*)?dard",
                          r"head\s*ache"),
@@ -102,10 +110,21 @@ FETAL_TERMS = ("हलचल", "हिल", "हिलना", "हिलता"
 FETAL_REDUCED = ("कम", "नहीं", "नही", "बंद", "धीमा", "kam", "nahi", "nahin", "band", "less", "reduced",
                  "decreased", "no", "not", "slow")
 FETAL_NOT_REDUCED = ("कम नहीं", "kam nahi", "not less", "not reduced")
+# Explicit "it's fine" wording. Movement is only "normal" when one of these is said;
+# a mention with neither reduced nor normal wording is "unclear" and gets asked again.
+FETAL_NORMAL = ("ठीक", "अच्छ", "सामान्य", "नॉर्मल", "सही", "बराबर", "हिल रहा", "हिल रही", "हिलता है", "हिलती है",
+                "theek", "thik", "achh", "achchh", "normal", "fine", "good", "well", "sahi", "ok", "okay", "regular",
+                "hil raha", "hil rahi", "moving", "kicking")
+# Speech engines often write काम ("work") for कम ("less"); next to a movement word it means कम.
+_KAAM_AS_KAM = re.compile(r"(?<![\u0900-\u097F])काम(?![\u0900-\u097F])|(?<![a-z])kaam(?![a-z])")
 
 IFA_TERMS = ("आयरन", "आइरन", "आईएफए", "फोलिक", "लाल गोली", "खून की गोली", "iron", "ifa", "folic",
              "lal goli", "khoon ki goli")
 IFA_NEGATIVE = NEGATIONS + ("बंद", "छोड़", "band", "chhod", "stopped", "skip")
+# Only these count as "taking / given"; a bare mention of iron tablets is left blank, not assumed.
+IFA_POSITIVE = ("ले रही", "लेती", "खा रही", "खाती", "रोज", "दी", "दीं", "दिया", "दिए", "मिली", "चल रही",
+                "le rahi", "leti", "kha rahi", "khati", "roz", "daily", "di", "diya", "diye", "taking", "takes",
+                "given", "gave", "started", "chal rahi")
 
 TD_TERMS = ("टीटी", "टीडी", "टिटनेस", "टेटनस", "tt", "td", "tetanus")
 VACCINE_TERMS = ("टीका", "टीके", "इंजेक्शन", "वैक्सीन", "teeka", "tika", "injection", "vaccine")
@@ -150,18 +169,57 @@ NO_TERMS = ("नहीं", "नही", "ना", "नो", "गलत", "म�
 
 # Plausibility ranges below are *input sanity checks* (reject "15 तारीख पर 2" as a BP),
 # not clinical thresholds — those live only in rules.py.
-def parse_bp(text: str) -> tuple[int | None, int | None]:
-    patterns = (
-        r"(\d{2,3})\s*(?:/|by|बाय|बाई|बटा|over|पर|ऑन)\s*(\d{2,3})",
-        r"(?:ऊपर|upar|uper|upper)\D{0,8}?(\d{2,3})\D{0,20}?(?:नीचे|niche|neeche|lower)\D{0,8}?(\d{2,3})",
-        r"(\d{2,3})\s*(?:ऊपर|upar|uper|upper)\D{0,12}?(\d{2,3})\s*(?:नीचे|niche|neeche|lower)",
-    )
-    for pat in patterns:
-        for m in re.finditer(pat, text):
-            sys_, dia = int(m.group(1)), int(m.group(2))
-            if 70 <= sys_ <= 260 and 40 <= dia <= 160 and sys_ > dia:
-                return sys_, dia
-    return None, None
+SYSTOLIC_RANGE, DIASTOLIC_RANGE = (70, 260), (40, 160)
+BP_WORD_REACH = 2  # words after "BP" (same clause) within which spoken numbers are taken as the BP
+
+_BP_WORD = r"(?:(?<![a-z])b\.?\s?p(?![a-z])|बीपी|बी पी|ब्लड प्रेशर|blood pressure|pressure|प्रेशर|रक्तचाप)"
+_BP_SEP = r"(?:/|by|बाय|बाई|बटा|बटे|बट्टा|over|ओवर|पर|ऑन)"
+_UP, _DOWN = r"(?:ऊपर|upar|uper|upper)", r"(?:नीचे|niche|neeche|lower)"
+# Number pairs that look like a BP. \d{1,3} on purpose: a mis-heard "15 बाय 100" must still be
+# *seen* (and reported as unclear), never silently dropped.
+_BP_PAIRS = (
+    re.compile(rf"(\d{{1,3}})\s*{_BP_SEP}\s*(\d{{1,3}})(?!\d)"),
+    re.compile(rf"{_UP}\D{{0,8}}?(\d{{1,3}})\D{{0,20}}?{_DOWN}\D{{0,8}}?(\d{{1,3}})"),
+    re.compile(rf"(\d{{1,3}})\s*{_UP}\D{{0,12}}?(\d{{1,3}})\s*{_DOWN}"),
+)
+# "बीपी 150" — a BP word followed by a single number (the other half was lost).
+_BP_SINGLE = re.compile(rf"{_BP_WORD}\s*(?:का|ka|है|hai|:|-)?\s*(\d{{1,3}})(?!\d|\s*(?:/|by|बाय|बाई|बटा))")
+
+
+class BpReading(NamedTuple):
+    systolic: int | None
+    diastolic: int | None
+    heard: str | None  # set when a BP was spoken but is not a plausible reading
+
+
+def _plausible(systolic: int, diastolic: int) -> bool:
+    return (SYSTOLIC_RANGE[0] <= systolic <= SYSTOLIC_RANGE[1] and DIASTOLIC_RANGE[0] <= diastolic <= DIASTOLIC_RANGE[1]
+            and systolic > diastolic)
+
+
+def _right_after(text: str, word_end: int, start: int) -> bool:
+    """True if `start` follows the BP word closely: same clause, at most BP_WORD_REACH words between."""
+    gap = text[word_end:start]
+    return start >= word_end and not re.search(r"[,।;!?]|\.(?!\d)", gap) and len(gap.split()) <= BP_WORD_REACH
+
+
+def parse_bp(text: str) -> BpReading:
+    """A plausible pair -> the reading. A BP that was spoken but is implausible ("15 बाय 100",
+    "90 by 140", "बीपी 150") -> no values, `heard` set, so the app asks again. Never guesses."""
+    matches = [(i, m) for i, pat in enumerate(_BP_PAIRS) for m in pat.finditer(text)]
+    for _, m in matches:
+        if _plausible(int(m.group(1)), int(m.group(2))):
+            return BpReading(int(m.group(1)), int(m.group(2)), None)
+    # An implausible pair only counts as "BP unclear" when it is clearly about BP: it uses
+    # upar/neeche, or starts within a few words after "BP" (so "28/11" as a date doesn't).
+    bp_word_ends = [w.end() for w in re.finditer(_BP_WORD, text)]
+    for i, m in matches:
+        if i > 0 or any(_right_after(text, end, m.start()) for end in bp_word_ends):
+            return BpReading(None, None, f"{m.group(1)}/{m.group(2)}")
+    single = _BP_SINGLE.search(text)
+    if single:
+        return BpReading(None, None, single.group(1))
+    return BpReading(None, None, None)
 
 
 def parse_pregnancy_month(text: str) -> int | None:
@@ -224,11 +282,16 @@ def parse_symptoms(clauses: list[str]) -> list[str]:
 
 
 def parse_fetal_movement(clauses: list[str]) -> str | None:
+    """'reduced' | 'normal' | 'unclear' (mentioned, but neither) | None (not mentioned)."""
     for clause in clauses:
-        if _any(clause, FETAL_TERMS):
-            if _any(clause, FETAL_NOT_REDUCED):
-                return "normal"
-            return "reduced" if _any(clause, FETAL_REDUCED) else "normal"
+        if not _any(clause, FETAL_TERMS):
+            continue
+        clause = _KAAM_AS_KAM.sub("कम", clause)
+        if _any(clause, FETAL_NOT_REDUCED):
+            return "normal"
+        if _any(clause, FETAL_REDUCED):
+            return "reduced"
+        return "normal" if _any(clause, FETAL_NORMAL) else "unclear"
     return None
 
 
@@ -239,7 +302,9 @@ def parse_ifa(clauses: list[str]) -> tuple[bool | None, int | None]:
         # "30 गोली", "30 आयरन की गोलियां", "30 iron tablets": number up to 3 words before the noun
         m = re.search(r"(\d{1,3})\s+(?:\S+\s+){0,3}?(?:गोली|गोलियां|टैबलेट|tablets?|goli|goliyan)", clause)
         tablets = int(m.group(1)) if m else None
-        return (not _any(clause, IFA_NEGATIVE)), tablets
+        if _any(clause, IFA_NEGATIVE):
+            return False, tablets
+        return (True if tablets or _any(clause, IFA_POSITIVE) else None), tablets
     return None, None
 
 
@@ -330,7 +395,7 @@ def match_beneficiary(text: str, people: Iterable[KnownBeneficiary]) -> KnownBen
 def parse_visit(text: str, today: date, people: Iterable[KnownBeneficiary] = ()) -> VisitFields:
     norm = _preprocess(text)
     clauses = split_clauses(norm)
-    systolic, diastolic = parse_bp(norm)
+    bp = parse_bp(norm)
     ifa_taking, ifa_tablets = parse_ifa(clauses)
     td_dose, vaccine_given = parse_td(clauses)
     person = match_beneficiary(norm, people)
@@ -338,8 +403,10 @@ def parse_visit(text: str, today: date, people: Iterable[KnownBeneficiary] = ())
         beneficiary_id=person.id if person else None,
         beneficiary_name=person.name_hi if person else None,
         pregnancy_month=parse_pregnancy_month(norm),
-        bp_systolic=systolic,
-        bp_diastolic=diastolic,
+        bp_systolic=bp.systolic,
+        bp_diastolic=bp.diastolic,
+        bp_unclear=bp.heard is not None,
+        bp_heard=bp.heard,
         hb=parse_hb(norm),
         weight_kg=parse_weight(norm),
         temperature_f=parse_temperature(norm),
@@ -351,6 +418,32 @@ def parse_visit(text: str, today: date, people: Iterable[KnownBeneficiary] = ())
         vaccine_given=vaccine_given,
         next_visit_date=parse_next_visit(clauses, today),
     )
+
+
+def unclear_fields(f: VisitFields) -> list[str]:
+    """Fields that were spoken but not understood, so the read-back asks for them again."""
+    return [name for name, unclear in (("bp", f.bp_unclear), ("fetal_movement", f.fetal_movement == "unclear"))
+            if unclear]
+
+
+def merge_correction(base: VisitFields, new: VisitFields) -> tuple[VisitFields, bool]:
+    """Merge a spoken correction into an entry. Only what the correction actually says
+    changes; symptoms are added; the matched woman is kept unless a new one is named."""
+    merged, changed = base.model_dump(), False
+    skip = {"beneficiary_name", "beneficiary_name_en", "bp_unclear", "bp_heard", "symptoms"}
+    for key, value in new.model_dump().items():
+        if key in skip or value is None or value == merged[key]:
+            continue
+        merged[key], changed = value, True
+    added = [s for s in new.symptoms if s not in merged["symptoms"]]
+    if added:
+        merged["symptoms"], changed = merged["symptoms"] + added, True
+    if new.bp_systolic and new.bp_diastolic:
+        merged.update(bp_unclear=False, bp_heard=None)
+    elif new.bp_unclear:  # still not understood: keep asking, show the latest attempt
+        changed = changed or new.bp_heard != base.bp_heard
+        merged.update(bp_systolic=None, bp_diastolic=None, bp_unclear=True, bp_heard=new.bp_heard)
+    return VisitFields(**merged), changed
 
 
 def classify_confirmation(text: str) -> str:
