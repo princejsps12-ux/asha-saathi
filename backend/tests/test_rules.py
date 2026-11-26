@@ -13,11 +13,12 @@ def codes(**kw) -> list[str]:
 
 
 @pytest.mark.parametrize("sys_,dia,expected", [
-    (140, 90, ["hypertension"]),           # boundary is inclusive
+    (140, 90, ["hypertension"]),           # [SBA] p.31: "140 mmHg or more and/or … 90 mmHg or more"
     (139, 89, []),
     (120, 92, ["hypertension"]),           # diastolic alone is enough
-    (160, 100, ["severe_hypertension"]),   # severe replaces plain hypertension
-    (130, 110, ["severe_hypertension"]),
+    (170, 100, ["hypertension"]),          # MoHFW gives no systolic "severe" cut-off: still refer today
+    (130, 110, ["hypertension"]),          # [SBA] p.31: severe is diastolic *above* 110
+    (130, 112, ["severe_hypertension"]),   # severe replaces plain hypertension
 ])
 def test_bp_thresholds(sys_, dia, expected):
     assert codes(bp_systolic=sys_, bp_diastolic=dia) == expected
@@ -48,7 +49,7 @@ def test_headache_with_blurred_vision_is_red():
 
 @pytest.mark.parametrize("symptom,code", [
     ("bleeding", "bleeding"), ("convulsions", "convulsions"), ("abdominal_pain", "abdominal_pain"),
-    ("breathlessness", "severe_anaemia"),
+    ("breathlessness", "breathlessness"),
 ])
 def test_single_red_symptoms(symptom, code):
     alerts = evaluate(VisitFields(symptoms=[symptom]))
@@ -66,6 +67,25 @@ def test_hb_thresholds(hb, expected):
     assert codes(hb=hb) == expected
 
 
+@pytest.mark.parametrize("hb,month,expected", [
+    (10.7, 5, []),            # [AMB] p.56 WHO 2024: 2nd trimester anaemia is below 10.5
+    (10.4, 5, ["anaemia"]),
+    (10.7, 8, ["anaemia"]),   # 3rd trimester: below 11.0
+    (10.7, 2, ["anaemia"]),   # 1st trimester: below 11.0
+    (10.7, None, ["anaemia"]),  # month unknown: the stricter 11.0
+])
+def test_hb_cutoff_depends_on_trimester(hb, month, expected):
+    assert codes(hb=hb, pregnancy_month=month) == expected
+
+
+def test_referral_level_follows_sba_box7_columns():
+    by_code = {r.code: r for r in RULES}
+    for fru in ("bleeding", "convulsions", "severe_anaemia", "reduced_fetal_movement", "headache_blurred_vision"):
+        assert by_code[fru].action == rules.EMERGENCY, fru
+    for phc in ("hypertension", "breathlessness", "high_fever", "abdominal_pain"):
+        assert by_code[phc].action == rules.REFER, phc
+
+
 def test_weakness_without_hb_asks_for_test():
     assert codes(symptoms=["pallor_weakness"]) == ["anaemia"]
 
@@ -73,6 +93,8 @@ def test_weakness_without_hb_asks_for_test():
 def test_fever_measured_vs_reported():
     assert codes(temperature_f=101.0, symptoms=["fever"]) == ["high_fever"]
     assert codes(temperature_f=99.0) == []
+    assert codes(temperature_f=100.4) == []                # [SBA] Box 7: "more than 38°C"
+    assert codes(temperature_f=100.5) == ["high_fever"]
     assert codes(symptoms=["fever"]) == ["fever_reported"]
 
 
@@ -89,8 +111,14 @@ def test_red_alerts_sorted_before_amber_and_risk_level():
     assert risk_level(evaluate(VisitFields(bp_systolic=110, bp_diastolic=70))) == "normal"
 
 
-def test_every_rule_cites_a_guideline_and_has_unique_code():
-    assert all(r.source.startswith("[") for r in RULES)
+def test_every_rule_cites_a_guideline_page_and_has_unique_code():
+    import re
+    known = {"SBA", "CHO", "MCP", "AMB"}
+    for r in RULES:
+        tags = re.findall(r"\[(\w+)\] p\.\d+", r.source)
+        assert tags and set(tags) <= known, f"{r.code}: {r.source}"
+        for tag in tags:
+            assert f"[{tag}]" in rules.__doc__ and "https://" in rules.__doc__  # tag is defined with its URL
     assert len({r.code for r in RULES}) == len(RULES)
 
 

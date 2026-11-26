@@ -97,17 +97,16 @@ Reported from a real mic test: a pause after "क्या यह सही ह�
 - [x] Found during browser verification: restoring before the server date loaded crashed the next-visit chips → fixed, regression-tested
 - [x] Tests: component tests (pause then tap mic → fields kept; correction after timeout; refresh restores pending visit; Yes/No; New visit) + unit tests for confirmFlow and pendingVisit — 36 vitest + 201 pytest, all passing in Docker; mutation-checked (re-introducing the bug fails 4 tests)
 
-## IN PROGRESS — citation verification + live deploy (started 2026-11-27)
-Resume here. Official PDFs were downloaded to the session scratchpad (`cite/pdf/`); text is extracted in `cite/*.txt`; `cite/find.py <txt> <regex>` prints PDF page numbers.
+## Citation verification (done 2026-11-27)
+Every threshold and danger sign in `rules.py` was checked against the actual government PDFs: [SBA] the 2010 ANC/SBA guideline, [CHO] the 2021 NHSRC CHO manual, [MCP] the 2018 MCP card, and [AMB] the June 2026 Anemia Mukt Bharat guideline. Each rule now cites the document, PDF page and URL in code and in the README table (with #page links).
+- [x] 140/90 hypertension ✅ (SBA p.31, CHO p.45)
+- [x] **Fixed** severe BP: was ≥160/110 → now **diastolic > 110** only (SBA p.31, CHO p.22/29; no systolic cut-off in MoHFW docs)
+- [x] **Fixed** anaemia: was <11 throughout → now **<10.5 in the 2nd trimester**, <11 otherwise (AMB 2026 p.56, WHO 2024); severe <7 ✅
+- [x] **Fixed** fever: ≥38 °C → **>38 °C** (SBA Box 7 p.43)
+- [x] **Fixed** referral levels to match SBA Box 7 (FRU vs 24-h PHC); breathlessness split into its own rule
+- [x] IFA 180 tablets from the 2nd trimester ✅ (AMB p.50); quickening 18–22 weeks → month 5 ✅ (SBA p.36)
+- [x] Dropped as sources: PMSMA (no numbers), ASHA Module 7 (child health); ASHA Module 6 host unreachable
+- [x] Tests updated/added (trimester Hb, BP boundaries, fever boundary, Box 7 levels, every rule cites [TAG] p.N with a URL) → 208 pytest pass in Docker
 
-**Verified so far** in MoHFW Maternal Health Division, *Guidelines for Antenatal Care and Skilled Attendance at Birth by ANMs/LHVs/SNs* (April 2010), https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf (PDF page numbers):
-- [x] Hypertension: systolic ≥140 and/or diastolic ≥90 mmHg (p31); refer to MO if ≥140/90 with urine protein (p32) → our 140/90 ✅
-- [ ] **Severe BP: this document only says diastolic >110 mmHg is a danger sign (p31); it has NO 160 systolic.** → change `BP_SEVERE_SYSTOLIC=160` (needs another source, e.g. the NHSRC CHO manual 2021) or keep diastolic-only and cite p31
-- [x] Hb: <11 g/dl = anaemia, 7–11 moderate, <7 severe (p37) ✅
-- [x] Quickening at 18–22 weeks; decreased foetal movements = possible foetal distress (p36); listed as a danger sign (p28, Box 7 p42) ✅ (our month 5 ≈ 18–22 weeks)
-- [ ] IFA: the 2010 guideline says "at least 100 tablets" (p21); Anemia Mukt Bharat (2018 / revised June 2026, https://www.nhm.gov.in/New-Update-2025-26/Nutrition/AMB-guidelines/AMB-Abhiyaan-Guidelines.pdf) gives 180 — check `cite/amb2026.txt` for the page
-- [ ] Still to check: fever threshold, face/hand swelling, bleeding and breathlessness in Box 7 (p42–43), the MCP card 2018 (`cite/mcp2018.txt`), the NHSRC CHO manual 2021 (`cite/cho2021.txt`), ASHA Module 7 (`cite/asha7.txt`)
-- [ ] PMSMA documents list HRP categories (severe anaemia, PIH) but give NO numeric cut-offs → drop PMSMA as the source of numbers
-- [ ] Then: update rules.py comments (doc, page, URL), fix the severe-BP rule, update the README rules table, re-run all tests in Docker
-
-**Deploy (not started):** no HF/Render/Fly CLIs or tokens on this machine. Plan: Render "New Web Service → public Git repo → Docker → Free" via the user's browser login, or Hugging Face Spaces (Docker, `app_port`). First make the Dockerfile HEALTHCHECK use `$PORT` (Render sets PORT). Then put the live link at the top of the README, run Try sample on it, and notify.
+## IN PROGRESS — live deploy
+No HF/Render/Fly CLIs or tokens on this machine. Plan: Render "New Web Service → public Git repo → Docker → Free" via the user's browser login, or Hugging Face Spaces (Docker, `app_port`). First make the Dockerfile HEALTHCHECK use `$PORT` (Render sets PORT). Then put the live link at the top of the README, run Try sample on it, and notify.

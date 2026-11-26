@@ -97,33 +97,43 @@ No feature in the core flow depends on a paid API.
 
 ## Danger-sign rules and sources
 
-All thresholds are named constants in [`backend/app/rules.py`](backend/app/rules.py). Each one has a comment citing its source, and there are no unexplained numbers. Every alert shows **why** it fired, with the measured value.
+All thresholds are named constants in [`backend/app/rules.py`](backend/app/rules.py). Each one carries a comment with the source document, the PDF page and a short quote, and there are no unexplained numbers. Every alert shows **why** it fired, with the measured value, plus its source. I checked every value against the actual government PDFs on 27 Nov 2026; links go straight to the page.
 
-| Rule | Fires when | Severity | Source |
+The referral level follows the 2010 ANC guideline's **Box 7**, which sorts each danger sign into *"Visit FRU"* (🚑 emergency) or *"Visit 24-hour PHC"* (🔴 refer today).
+
+| Rule | Fires when | Action | Source (PDF page) |
 |---|---|---|---|
-| Severe high BP | BP ≥ **160/110** mmHg | 🔴 emergency | [SBA] PIH; [PMSMA] HRP criteria |
-| High BP in pregnancy | BP ≥ **140/90** mmHg | 🔴 refer today | [SBA] PIH section |
-| Convulsions | fits / झटके / दौरा पड़ा | 🔴 emergency | [MCP]; [SBA] eclampsia |
-| Pre-eclampsia warning | swelling **+** headache or blurred vision | 🔴 refer | [MCP] danger signs |
-| Face / hand swelling | swelling of face or hands | 🔴 refer | [MCP] |
-| Headache + blurred vision | both present | 🔴 refer | [MCP] |
-| Bleeding | any vaginal bleeding | 🔴 emergency | [MCP]; [ASHA] Module 7 |
-| Reduced fetal movement | movement कम / नहीं, from **month 5** (quickening ≈ 20 weeks) | 🔴 refer | [MCP]; [SBA] |
-| Severe anaemia | Hb **< 7** g/dL, or breathlessness | 🔴 refer | [AMB]; [MCP] |
-| Abdominal pain | reported (deliberately over-alerts: severity can't be graded at home) | 🔴 refer | [MCP] |
-| High fever | temp ≥ **100.4 °F (38 °C)** | 🔴 refer | [MCP]; [SBA] |
-| Anaemia | Hb **< 11** g/dL, or weakness/pallor with no Hb | 🟠 watch | [AMB] |
-| Fever (not measured) | fever reported, no temperature | 🟠 watch | [MCP] |
-| Swelling of feet only | alone | 🟠 check BP | [SBA] |
-| Headache only | alone | 🟠 check BP | [SBA] |
-| Not taking IFA | from **month 4** (180 tablets advised) | 🟠 watch | [AMB] |
+| Severe high BP | **diastolic > 110** mmHg ("imminent eclampsia") | 🚑 FRU now | [SBA p.31](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=31), [CHO p.29](https://nhsrcindia.org/sites/default/files/2021-12/Care%20During%20Pregnancy%20and%20Childbirth%20Training%20Manual%20for%20CHO%20at%20AB-HWC.pdf#page=29) |
+| Convulsions | fits / झटके / दौरा पड़ा | 🚑 FRU now | [SBA p.42](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=42) Box 7, [MCP p.4](https://nhm.gov.in/New_Updates_2018/NHM_Components/Immunization/Guildelines_for_immunization/MCP_Card_English_version.pdf#page=4) |
+| Bleeding | any bleeding in pregnancy | 🚑 FRU now | [SBA p.42](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=42) Box 7, [MCP p.4](https://nhm.gov.in/New_Updates_2018/NHM_Components/Immunization/Guildelines_for_immunization/MCP_Card_English_version.pdf#page=4) |
+| Headache + blurred vision | both present | 🚑 FRU now | [SBA p.42](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=42) Box 7, [MCP p.4](https://nhm.gov.in/New_Updates_2018/NHM_Components/Immunization/Guildelines_for_immunization/MCP_Card_English_version.pdf#page=4) |
+| Reduced fetal movement | कम / नहीं, from **month 5** (quickening at 18–22 weeks) | 🚑 FRU now | [SBA p.36](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=36), [SBA p.42](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=42) Box 7 |
+| Severe anaemia | Hb **< 7** g/dL | 🚑 FRU now | [SBA p.42](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=42) Box 7, [AMB p.56](https://www.nhm.gov.in/New-Update-2025-26/Nutrition/AMB-guidelines/AMB-Abhiyaan-Guidelines.pdf#page=56) |
+| High BP in pregnancy | systolic **≥ 140** and/or diastolic **≥ 90** | 🔴 24-h PHC today | [SBA p.31](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=31), [CHO p.45](https://nhsrcindia.org/sites/default/files/2021-12/Care%20During%20Pregnancy%20and%20Childbirth%20Training%20Manual%20for%20CHO%20at%20AB-HWC.pdf#page=45) |
+| Pre-eclampsia warning | swelling **+** headache or blurred vision | 🔴 24-h PHC today | [SBA p.43](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=43) Box 7, [MCP p.4](https://nhm.gov.in/New_Updates_2018/NHM_Components/Immunization/Guildelines_for_immunization/MCP_Card_English_version.pdf#page=4) |
+| Face / hand swelling | oedema of face or hands ("abnormal … refer immediately") | 🔴 refer today | [SBA p.31](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=31) |
+| Breathlessness | reported | 🔴 24-h PHC today | [SBA p.42](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=42) Box 7, [MCP p.4](https://nhm.gov.in/New_Updates_2018/NHM_Components/Immunization/Guildelines_for_immunization/MCP_Card_English_version.pdf#page=4) |
+| Abdominal pain | reported (Box 7 says "continuous severe"; we over-alert on purpose, since severity can't be graded at home) | 🔴 24-h PHC today | [SBA p.43](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=43) Box 7 |
+| High fever | temperature **> 100.4 °F (38 °C)** | 🔴 24-h PHC today | [SBA p.43](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=43) Box 7, [MCP p.4](https://nhm.gov.in/New_Updates_2018/NHM_Components/Immunization/Guildelines_for_immunization/MCP_Card_English_version.pdf#page=4) |
+| Anaemia | Hb **< 11.0** g/dL (1st/3rd trimester) or **< 10.5** (2nd trimester, months 4–6); or weakness with no Hb test | 🟠 watch | [AMB p.56](https://www.nhm.gov.in/New-Update-2025-26/Nutrition/AMB-guidelines/AMB-Abhiyaan-Guidelines.pdf#page=56) (WHO 2024 cut-offs) |
+| Fever (not measured) | fever reported, no temperature | 🟠 watch | [MCP p.4](https://nhm.gov.in/New_Updates_2018/NHM_Components/Immunization/Guildelines_for_immunization/MCP_Card_English_version.pdf#page=4) |
+| Swelling of feet only | alone ("could be normal"; check BP) | 🟠 check BP | [SBA p.31](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=31) |
+| Headache only | alone | 🟠 check BP | [SBA p.31](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=31) |
+| Not taking IFA | from **month 4**: "one Red-IFA tablet for **180 days** starting from the second trimester" | 🟠 watch | [AMB p.50](https://www.nhm.gov.in/New-Update-2025-26/Nutrition/AMB-guidelines/AMB-Abhiyaan-Guidelines.pdf#page=50) |
+| BP / movement unclear | spoken but not understood | 🟠 ask again | [SBA p.31](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=31) (measure BP at every visit), [SBA p.36](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf#page=36) |
 
-**Sources (Government of India):**
-- **[SBA]** MoHFW, *Guidelines for Antenatal Care and Skilled Attendance at Birth by ANMs/LHVs/SNs* (2010)
-- **[MCP]** MoHFW, *Mother and Child Protection Card*, "danger signs during pregnancy"
-- **[ASHA]** NHM, *ASHA training modules 6 & 7*
-- **[AMB]** MoHFW, *Anemia Mukt Bharat — Intensified NIPI Operational Guidelines* (2018)
-- **[PMSMA]** MoHFW, *Pradhan Mantri Surakshit Matritva Abhiyan*, high-risk pregnancy criteria
+**Sources (Government of India, MoHFW). Page numbers are PDF pages as shown by a PDF viewer:**
+- **[SBA]** Maternal Health Division, MoHFW, [*Guidelines for Antenatal Care and Skilled Attendance at Birth by ANMs/LHVs/SNs*](https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf), April 2010.
+- **[CHO]** MoHFW / NHSRC, [*Training Manual on Care During Pregnancy and Child Birth for Community Health Officer at Ayushman Bharat – Health and Wellness Centres*](https://nhsrcindia.org/sites/default/files/2021-12/Care%20During%20Pregnancy%20and%20Childbirth%20Training%20Manual%20for%20CHO%20at%20AB-HWC.pdf), 2021.
+- **[MCP]** MoHFW & MoWCD, [*Mother and Child Protection Card*](https://nhm.gov.in/New_Updates_2018/NHM_Components/Immunization/Guildelines_for_immunization/MCP_Card_English_version.pdf), 2018 English version. Page 4 is the "danger signs … take the pregnant woman to the hospital immediately" panel.
+- **[AMB]** MoHFW, [*Anemia Mukt Bharat Abhiyaan Operational Guidelines*](https://www.nhm.gov.in/New-Update-2025-26/Nutrition/AMB-guidelines/AMB-Abhiyaan-Guidelines.pdf), June 2026. It uses the WHO 2024 haemoglobin cut-offs.
+
+**What the source check changed (27 Nov 2026):**
+- *Severe BP:* this was "≥ 160/110". The MoHFW documents define it only as **diastolic above 110** and give no systolic cut-off, so 160 systolic was removed. A reading like 170/100 still raises "High BP — refer today".
+- *Anaemia:* this was "< 11" for the whole pregnancy. The current AMB guideline (WHO 2024) uses **< 10.5 in the second trimester**.
+- *Fever:* this was "≥ 38 °C". Box 7 says **more than 38 °C**.
+- *Referral level:* now follows Box 7. Reduced fetal movement, Hb < 7 and headache with blurred vision are **FRU emergencies**. Breathlessness is its own **24-h PHC** rule.
+- *Sources dropped:* the PMSMA guidelines (they list high-risk *categories* but no numbers) and ASHA Module 7 (it covers child health, not pregnancy). The ASHA Module 6 server was unreachable during the check.
 
 ⚠️ This is decision **support** for frontline workers, not a diagnosis. Thresholds should be reviewed by the district medical officer before field use.
 

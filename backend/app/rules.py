@@ -1,15 +1,26 @@
 """ANC danger-sign rules. EVERY clinical threshold lives in this file.
 
-Sources (Government of India, MoHFW / NHM):
-  [SBA]  MoHFW, "Guidelines for Antenatal Care and Skilled Attendance at Birth by
-         ANMs/LHVs/SNs" (2010) — ANC examination, PIH, anaemia and referral sections.
-  [MCP]  MoHFW, Mother and Child Protection (MCP) Card — "danger signs during
-         pregnancy, go to hospital immediately" panel.
-  [ASHA] NHM, ASHA Module 6 / "Home Based Newborn Care" & ASHA Module 7 — danger
-         signs in pregnancy that ASHA must refer.
-  [AMB]  MoHFW, Anemia Mukt Bharat Intensified NIPI Operational Guidelines (2018).
-  [PMSMA] MoHFW, Pradhan Mantri Surakshit Matritva Abhiyan — high-risk pregnancy
-         (HRP) identification criteria.
+Each threshold and rule cites an official Government of India document by short tag,
+PDF page number (as counted by a PDF viewer) and the document's URL. All were checked
+against the actual PDFs on 2026-11-27.
+
+  [SBA]  MoHFW Maternal Health Division, "Guidelines for Antenatal Care and Skilled
+         Attendance at Birth by ANMs/LHVs/SNs", April 2010.
+         https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf
+         Box 7 "Danger signs during pregnancy" (PDF p.42–43) sorts each sign into
+         "Visit FRU" or "Visit 24-hour PHC"; our EMERGENCY / REFER actions follow it.
+  [CHO]  MoHFW / NHSRC, "Training Manual on Care During Pregnancy and Child Birth for
+         Community Health Officer at Ayushman Bharat – Health and Wellness Centres", 2021.
+         https://nhsrcindia.org/sites/default/files/2021-12/Care%20During%20Pregnancy%20and%20Childbirth%20Training%20Manual%20for%20CHO%20at%20AB-HWC.pdf
+  [MCP]  MoHFW & MoWCD, "Mother and Child Protection Card" (2018 English version).
+         https://nhm.gov.in/New_Updates_2018/NHM_Components/Immunization/Guildelines_for_immunization/MCP_Card_English_version.pdf
+         PDF p.4: "danger signs, take the pregnant woman to the hospital immediately".
+  [AMB]  MoHFW, "Anemia Mukt Bharat Abhiyaan Operational Guidelines", June 2026
+         (uses the WHO 2024 haemoglobin cut-offs).
+         https://www.nhm.gov.in/New-Update-2025-26/Nutrition/AMB-guidelines/AMB-Abhiyaan-Guidelines.pdf
+
+Not used for numbers: the PMSMA guidelines list high-risk *categories* (severe anaemia,
+PIH, …) but give no numeric cut-offs.
 
 These rules support, not replace, clinical judgement. Thresholds should be reviewed
 by the district's medical officer before field deployment.
@@ -22,26 +33,35 @@ from dataclasses import dataclass
 from .schemas import Alert, VisitFields
 
 # ----------------------------------------------------------------- thresholds
-# [SBA] PIH section: BP >= 140/90 mmHg at ANC = hypertension in pregnancy -> refer to MO.
+# [SBA] PDF p.31: "Hypertension is diagnosed when … systolic … 140 mmHg or more and/or the
+# diastolic … 90 mmHg or more". Same in [CHO] PDF p.45. Box 7 (PDF p.42): high BP -> 24-hour PHC.
 BP_HIGH_SYSTOLIC = 140
 BP_HIGH_DIASTOLIC = 90
-# [SBA] / [PMSMA]: BP >= 160/110 mmHg = severe hypertension -> urgent referral to FRU.
-BP_SEVERE_SYSTOLIC = 160
-BP_SEVERE_DIASTOLIC = 110
-# [AMB] / [SBA]: Hb < 11 g/dL = anaemia in pregnancy; Hb < 7 g/dL = severe anaemia.
+# [SBA] PDF p.31: "If the diastolic blood pressure … is above 110 mmHg, it is a danger sign that
+# points towards imminent eclampsia" -> FRU immediately. Same in [CHO] PDF p.22 and p.29.
+# These MoHFW documents give NO systolic "severe" cut-off (e.g. 160), so none is used here.
+BP_SEVERE_DIASTOLIC_ABOVE = 110
+# [AMB] PDF p.56 (WHO 2024 cut-offs, pregnant women): anaemia is Hb below 11.0 g/dL in the first
+# and third trimesters and below 10.5 g/dL in the second trimester; severe is below 7.0 g/dL.
+# [SBA] PDF p.37 (2010) used one cut-off of 11 g/dl for the whole pregnancy.
 HB_ANAEMIA = 11.0
+HB_ANAEMIA_SECOND_TRIMESTER = 10.5
+SECOND_TRIMESTER_MONTHS = range(4, 7)  # months 4–6 (≈ weeks 14–27); unknown month -> 11.0, the stricter cut-off
+# [AMB] PDF p.56 and p.62, [SBA] PDF p.37: severe anaemia Hb < 7 g/dL; Box 7 (PDF p.42): Hb < 7 -> FRU.
 HB_SEVERE_ANAEMIA = 7.0
-# [SBA]: quickening is felt from ~20 weeks (5th month); [MCP] reduced/absent fetal
-# movement after that is a danger sign.
+# [SBA] PDF p.36: foetal movements ("quickening") "begin at around 18–22 weeks", i.e. month 5;
+# "Decreased movements may be an indication of foetal distress". Box 7 (PDF p.42): -> FRU.
 FETAL_MOVEMENT_FROM_MONTH = 5
-# [MCP] "high fever" is a danger sign; fever = temperature >= 38 °C (100.4 °F) [SBA].
-FEVER_F = 100.4
-# [AMB]: 180 IFA tablets in pregnancy, 1 daily starting from the 2nd trimester (4th month).
+# [SBA] Box 7 (PDF p.43): "Temperature more than 38°C" -> 24-hour PHC. 38 °C = 100.4 °F.
+FEVER_ABOVE_F = 100.4
+# [AMB] PDF p.50: "Daily one Red-IFA tablet for 180 days starting from the second trimester".
+# The second trimester starts in month 4. ([SBA] PDF p.21, from 2010, said "at least 100 tablets".)
 IFA_START_MONTH = 4
+IFA_TABLETS = 180
 
-# (Hindi, English) referral actions.
+# (Hindi, English) referral actions, matching the two columns of [SBA] Box 7 (PDF p.42–43).
 EMERGENCY = ("तुरंत 108 एम्बुलेंस बुलाएँ / FRU रेफ़र करें", "Call 108 ambulance / refer to FRU now")
-REFER = ("आज ही PHC / मेडिकल ऑफिसर के पास रेफ़र करें", "Refer to PHC / medical officer today")
+REFER = ("आज ही 24 घंटे वाले PHC / मेडिकल ऑफिसर के पास रेफ़र करें", "Refer to a 24-hour PHC / medical officer today")
 WATCH = ("ANM को बताएं, अगली विज़िट में दोबारा जाँचें", "Inform the ANM and recheck at the next visit")
 ASK_AGAIN = ("दोबारा नापें / पूछें और दर्ज करें", "Measure / ask again and record it")
 
@@ -58,7 +78,7 @@ class Rule:
     title_hi: str
     title_en: str
     action: tuple[str, str]  # (Hindi, English)
-    source: str
+    source: str  # document tag + PDF page, e.g. "[SBA] p.42 Box 7"
     check: Callable[[VisitFields], Why | None]  # returns WHY (en, hi) when fired
 
 
@@ -70,10 +90,15 @@ def _bp(f: VisitFields) -> str:
     return f"{f.bp_systolic or '?'}/{f.bp_diastolic or '?'}"
 
 
+def anaemia_cutoff(month: int | None) -> float:
+    """Hb below which a pregnant woman is anaemic, for her month of pregnancy ([AMB] PDF p.56)."""
+    return HB_ANAEMIA_SECOND_TRIMESTER if month in SECOND_TRIMESTER_MONTHS else HB_ANAEMIA
+
+
 def _severe_htn(f: VisitFields) -> Why | None:
-    if (f.bp_systolic or 0) >= BP_SEVERE_SYSTOLIC or (f.bp_diastolic or 0) >= BP_SEVERE_DIASTOLIC:
-        limit = f"{BP_SEVERE_SYSTOLIC}/{BP_SEVERE_DIASTOLIC}"
-        return f"BP {_bp(f)} mmHg ≥ {limit}", f"बीपी {_bp(f)} — सीमा {limit} या ज़्यादा"
+    if (f.bp_diastolic or 0) > BP_SEVERE_DIASTOLIC_ABOVE:
+        return (f"BP {_bp(f)} mmHg: diastolic above {BP_SEVERE_DIASTOLIC_ABOVE} (imminent eclampsia)",
+                f"बीपी {_bp(f)} — नीचे वाला {BP_SEVERE_DIASTOLIC_ABOVE} से ज़्यादा (एक्लेम्पसिया का खतरा)")
     return None
 
 
@@ -131,31 +156,40 @@ def _fetal_movement(f: VisitFields) -> Why | None:
 def _severe_anaemia(f: VisitFields) -> Why | None:
     if f.hb is not None and f.hb < HB_SEVERE_ANAEMIA:
         return f"Hb {f.hb} g/dL < {HB_SEVERE_ANAEMIA}", f"हीमोग्लोबिन {f.hb} — {HB_SEVERE_ANAEMIA} से कम"
+    return None
+
+
+def _breathlessness(f: VisitFields) -> Why | None:
     if _has(f, "breathlessness"):
-        return "Breathlessness reported (sign of severe anaemia)", "सांस फूलना (गंभीर खून की कमी का संकेत)"
+        return ("Breathlessness reported (possible severe anaemia)",
+                "सांस फूलना (गंभीर खून की कमी का संकेत हो सकता है)")
     return None
 
 
 def _anaemia(f: VisitFields) -> Why | None:
-    if f.hb is not None and HB_SEVERE_ANAEMIA <= f.hb < HB_ANAEMIA:
-        return f"Hb {f.hb} g/dL < {HB_ANAEMIA}", f"हीमोग्लोबिन {f.hb} — {HB_ANAEMIA} से कम"
-    if f.hb is None and _has(f, "pallor_weakness") and not _severe_anaemia(f):
+    cutoff = anaemia_cutoff(f.pregnancy_month)
+    if f.hb is not None and HB_SEVERE_ANAEMIA <= f.hb < cutoff:
+        trimester = "2nd trimester" if cutoff == HB_ANAEMIA_SECOND_TRIMESTER else "1st/3rd trimester"
+        return (f"Hb {f.hb} g/dL < {cutoff} ({trimester} cut-off)",
+                f"हीमोग्लोबिन {f.hb} — {cutoff} से कम")
+    if f.hb is None and _has(f, "pallor_weakness"):
         return ("Weakness/pallor reported, Hb not measured — get Hb test",
                 "कमज़ोरी / पीलापन, हीमोग्लोबिन जाँच नहीं हुई — जाँच कराएँ")
     return None
 
 
 def _abdominal_pain(f: VisitFields) -> Why | None:
-    # Over-alerting is deliberate: an ASHA cannot grade pain severity at home.
+    # [SBA] Box 7 lists "continuous severe abdominal pain". We alert on any reported abdominal
+    # pain on purpose: an ASHA cannot grade pain severity at home.
     if _has(f, "abdominal_pain"):
         return "Abdominal pain reported — needs examination", "पेट में दर्द — जाँच ज़रूरी"
     return None
 
 
 def _high_fever(f: VisitFields) -> Why | None:
-    if f.temperature_f is not None and f.temperature_f >= FEVER_F:
-        return (f"Temperature {f.temperature_f} °F ≥ {FEVER_F} °F",
-                f"तापमान {f.temperature_f} °F — {FEVER_F} °F या ज़्यादा")
+    if f.temperature_f is not None and f.temperature_f > FEVER_ABOVE_F:
+        return (f"Temperature {f.temperature_f} °F > {FEVER_ABOVE_F} °F (38 °C)",
+                f"तापमान {f.temperature_f} °F — {FEVER_ABOVE_F} °F (38 °C) से ज़्यादा")
     return None
 
 
@@ -167,8 +201,8 @@ def _fever_reported(f: VisitFields) -> Why | None:
 
 def _no_ifa(f: VisitFields) -> Why | None:
     if f.ifa_taking is False and (f.pregnancy_month or IFA_START_MONTH) >= IFA_START_MONTH:
-        return (f"Not taking IFA tablets (180 tablets advised from month {IFA_START_MONTH})",
-                f"आयरन की गोली नहीं ले रही ({IFA_START_MONTH}वें महीने से 180 गोली ज़रूरी)")
+        return (f"Not taking IFA tablets ({IFA_TABLETS} tablets advised from month {IFA_START_MONTH})",
+                f"आयरन की गोली नहीं ले रही ({IFA_START_MONTH}वें महीने से {IFA_TABLETS} गोली ज़रूरी)")
     return None
 
 
@@ -203,36 +237,41 @@ def _headache_only(f: VisitFields) -> Why | None:
 
 
 RULES: tuple[Rule, ...] = (
-    Rule("severe_hypertension", "red", "बहुत ज़्यादा बीपी", "Severe high BP", EMERGENCY,
-         "[SBA] PIH; [PMSMA] HRP criteria", _severe_htn),
-    Rule("hypertension", "red", "हाई बीपी", "High BP in pregnancy", REFER, "[SBA] PIH: BP ≥140/90", _htn),
+    # --- [SBA] Box 7 "Visit FRU" column -> EMERGENCY
+    Rule("severe_hypertension", "red", "बहुत ज़्यादा बीपी", "Severe high BP (imminent eclampsia)", EMERGENCY,
+         "[SBA] p.31; [CHO] p.22, p.29", _severe_htn),
     Rule("convulsions", "red", "दौरे / झटके", "Convulsions", EMERGENCY,
-         "[MCP] danger signs; [SBA] eclampsia", _convulsions),
-    Rule("preeclampsia_signs", "red", "प्री-एक्लेम्पसिया के लक्षण", "Pre-eclampsia warning signs", REFER,
-         "[MCP] swelling of face/hands, severe headache, blurred vision", _preeclampsia),
-    Rule("face_hand_swelling", "red", "चेहरे/हाथों पर सूजन", "Swelling of face/hands", REFER,
-         "[MCP] danger signs", _face_swelling),
-    Rule("headache_blurred_vision", "red", "सिर दर्द और धुंधला दिखना", "Headache with blurred vision", REFER,
-         "[MCP] danger signs", _headache_vision),
+         "[SBA] p.42 Box 7; [MCP] p.4", _convulsions),
     Rule("bleeding", "red", "खून आना", "Bleeding in pregnancy", EMERGENCY,
-         "[MCP] danger signs; [ASHA] Module 7", _bleeding),
-    Rule("reduced_fetal_movement", "red", "बच्चे की हलचल कम", "Reduced fetal movement", REFER,
-         "[MCP] danger signs; [SBA] fetal movement", _fetal_movement),
-    Rule("severe_anaemia", "red", "गंभीर खून की कमी", "Severe anaemia", REFER,
-         "[AMB] Hb <7 g/dL; [MCP] breathlessness", _severe_anaemia),
-    Rule("abdominal_pain", "red", "पेट में दर्द", "Abdominal pain", REFER, "[MCP] danger signs", _abdominal_pain),
-    Rule("high_fever", "red", "तेज़ बुखार", "High fever", REFER, "[MCP] high fever; [SBA] ≥38 °C", _high_fever),
-    Rule("anaemia", "amber", "खून की कमी", "Anaemia", WATCH, "[AMB] Hb <11 g/dL in pregnancy", _anaemia),
-    Rule("fever_reported", "amber", "बुखार", "Fever (not measured)", WATCH, "[MCP] fever", _fever_reported),
-    Rule("swelling_feet", "amber", "पैरों में सूजन", "Swelling of feet", WATCH, "[SBA] oedema with BP check",
-         _swelling_only),
-    Rule("headache", "amber", "सिर दर्द", "Headache", WATCH, "[SBA] PIH symptom screening", _headache_only),
-    Rule("no_ifa", "amber", "आयरन की गोली नहीं ले रही", "Not taking IFA", WATCH,
-         "[AMB] 180 IFA tablets in pregnancy", _no_ifa),
+         "[SBA] p.42 Box 7; [MCP] p.4", _bleeding),
+    Rule("headache_blurred_vision", "red", "सिर दर्द और धुंधला दिखना", "Headache with blurred vision", EMERGENCY,
+         "[SBA] p.42 Box 7; [MCP] p.4", _headache_vision),
+    Rule("reduced_fetal_movement", "red", "बच्चे की हलचल कम", "Reduced fetal movement", EMERGENCY,
+         "[SBA] p.36, p.42 Box 7", _fetal_movement),
+    Rule("severe_anaemia", "red", "गंभीर खून की कमी", "Severe anaemia", EMERGENCY,
+         "[SBA] p.42 Box 7; [AMB] p.56, p.62", _severe_anaemia),
+    # --- refer today: [SBA] Box 7 "Visit 24-hour PHC" column, or "refer immediately" in the text
+    Rule("hypertension", "red", "हाई बीपी", "High BP in pregnancy", REFER,
+         "[SBA] p.31, p.42 Box 7; [CHO] p.45", _htn),
+    Rule("preeclampsia_signs", "red", "प्री-एक्लेम्पसिया के लक्षण", "Pre-eclampsia warning signs", REFER,
+         "[SBA] p.43 Box 7; [MCP] p.4", _preeclampsia),
+    Rule("face_hand_swelling", "red", "चेहरे/हाथों पर सूजन", "Swelling of face/hands", REFER,
+         "[SBA] p.31 (oedema)", _face_swelling),
+    Rule("breathlessness", "red", "सांस फूलना", "Breathlessness", REFER,
+         "[SBA] p.42 Box 7; [MCP] p.4", _breathlessness),
+    Rule("abdominal_pain", "red", "पेट में दर्द", "Abdominal pain", REFER, "[SBA] p.43 Box 7", _abdominal_pain),
+    Rule("high_fever", "red", "तेज़ बुखार", "High fever", REFER, "[SBA] p.43 Box 7; [MCP] p.4", _high_fever),
+    # --- watch / follow up
+    Rule("anaemia", "amber", "खून की कमी", "Anaemia", WATCH, "[AMB] p.56, p.62; [SBA] p.37", _anaemia),
+    Rule("fever_reported", "amber", "बुखार", "Fever (not measured)", WATCH, "[MCP] p.4; [SBA] p.43", _fever_reported),
+    Rule("swelling_feet", "amber", "पैरों में सूजन", "Swelling of feet", WATCH, "[SBA] p.31 (oedema)", _swelling_only),
+    Rule("headache", "amber", "सिर दर्द", "Headache", WATCH, "[SBA] p.31 (measure BP)", _headache_only),
+    Rule("no_ifa", "amber", "आयरन की गोली नहीं ले रही", "Not taking IFA", WATCH, "[AMB] p.50", _no_ifa),
+    # --- spoken but not understood: ask again
     Rule("bp_unclear", "amber", "बीपी साफ़ नहीं सुना", "BP not clear", ASK_AGAIN,
-         "[SBA] BP must be recorded at every ANC visit", _bp_unclear),
+         "[SBA] p.31 (measure BP at every visit)", _bp_unclear),
     Rule("fetal_movement_unclear", "amber", "हलचल साफ़ नहीं", "Baby movement unclear", ASK_AGAIN,
-         "[MCP] reduced fetal movement is a danger sign", _fetal_movement_unclear),
+         "[SBA] p.36", _fetal_movement_unclear),
 )
 
 
