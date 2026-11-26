@@ -96,3 +96,18 @@ Reported from a real mic test: a pause after "क्या यह सही ह�
 - [x] Pending visit kept in localStorage (24 h, safe with blocked storage); a refresh restores it with a "not saved yet" notice
 - [x] Found during browser verification: restoring before the server date loaded crashed the next-visit chips → fixed, regression-tested
 - [x] Tests: component tests (pause then tap mic → fields kept; correction after timeout; refresh restores pending visit; Yes/No; New visit) + unit tests for confirmFlow and pendingVisit — 36 vitest + 201 pytest, all passing in Docker; mutation-checked (re-introducing the bug fails 4 tests)
+
+## IN PROGRESS — citation verification + live deploy (started 2026-11-27)
+Resume here. Official PDFs were downloaded to the session scratchpad (`cite/pdf/`); text is extracted in `cite/*.txt`; `cite/find.py <txt> <regex>` prints PDF page numbers.
+
+**Verified so far** in MoHFW Maternal Health Division, *Guidelines for Antenatal Care and Skilled Attendance at Birth by ANMs/LHVs/SNs* (April 2010), https://nhm.gov.in/images/pdf/programmes/maternal-health/guidelines/sba_guidelines_for_skilled_attendance_at_birth.pdf (PDF page numbers):
+- [x] Hypertension: systolic ≥140 and/or diastolic ≥90 mmHg (p31); refer to MO if ≥140/90 with urine protein (p32) → our 140/90 ✅
+- [ ] **Severe BP: this document only says diastolic >110 mmHg is a danger sign (p31); it has NO 160 systolic.** → change `BP_SEVERE_SYSTOLIC=160` (needs another source, e.g. the NHSRC CHO manual 2021) or keep diastolic-only and cite p31
+- [x] Hb: <11 g/dl = anaemia, 7–11 moderate, <7 severe (p37) ✅
+- [x] Quickening at 18–22 weeks; decreased foetal movements = possible foetal distress (p36); listed as a danger sign (p28, Box 7 p42) ✅ (our month 5 ≈ 18–22 weeks)
+- [ ] IFA: the 2010 guideline says "at least 100 tablets" (p21); Anemia Mukt Bharat (2018 / revised June 2026, https://www.nhm.gov.in/New-Update-2025-26/Nutrition/AMB-guidelines/AMB-Abhiyaan-Guidelines.pdf) gives 180 — check `cite/amb2026.txt` for the page
+- [ ] Still to check: fever threshold, face/hand swelling, bleeding and breathlessness in Box 7 (p42–43), the MCP card 2018 (`cite/mcp2018.txt`), the NHSRC CHO manual 2021 (`cite/cho2021.txt`), ASHA Module 7 (`cite/asha7.txt`)
+- [ ] PMSMA documents list HRP categories (severe anaemia, PIH) but give NO numeric cut-offs → drop PMSMA as the source of numbers
+- [ ] Then: update rules.py comments (doc, page, URL), fix the severe-BP rule, update the README rules table, re-run all tests in Docker
+
+**Deploy (not started):** no HF/Render/Fly CLIs or tokens on this machine. Plan: Render "New Web Service → public Git repo → Docker → Free" via the user's browser login, or Hugging Face Spaces (Docker, `app_port`). First make the Dockerfile HEALTHCHECK use `$PORT` (Render sets PORT). Then put the live link at the top of the README, run Try sample on it, and notify.
