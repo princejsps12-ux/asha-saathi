@@ -177,3 +177,43 @@ def test_phone_sentence_repeated_as_an_answer_changes_nothing():
     base = p(PHONE_STT)
     _, changed = merge_correction(base, p(PHONE_STT))
     assert changed is False
+
+
+# Bug report: EN toggle, STT gave this and BP was marked "not clear". The UI language never
+# changes the text sent for extraction, so the same text must parse identically in
+# हिं + EN, हिं and EN (the frontend test checks the mode -> text part).
+EN_MODE_STT = "सुनीता साहू 7 महीने बीपी 150/100 पैरों में सूजन है बेबी मूवमेंट कम है अगले हफ्ते फिर आऊंगी"
+
+
+@pytest.mark.parametrize("mode", ["both", "hi", "en"])
+def test_bp_after_keyword_parses_in_every_language_mode(mode):
+    f = p(EN_MODE_STT)
+    assert (f.bp_systolic, f.bp_diastolic) == (150, 100), mode
+    assert f.bp_unclear is False and f.bp_heard is None
+    assert f.beneficiary_id == 1 and f.pregnancy_month == 7 and f.fetal_movement == "reduced"
+
+
+@pytest.mark.parametrize("text", [
+    "बीपी 150‎/‎100",   # left-to-right marks around the slash (mixed-script STT)
+    "BP 150‏/100",           # right-to-left mark
+    "बीपी 150​/100",         # zero-width space
+    "बीपी‍ 150/100",         # zero-width joiner after the keyword
+    "बीपी 150⁄100",               # fraction slash
+    "बीपी 150∕100",               # division slash
+    "बीपी 150／100",              # full-width slash
+    "बीपी １５０/１００",           # full-width digits
+    "BP 150/100",            # no-break space
+    "बीपी 150 100",               # "by" lost: plausible pair after the keyword
+    "BP: 150-100",
+    "बीपी है 150 / 100",
+])
+def test_bp_after_keyword_survives_invisible_marks_and_odd_separators(text):
+    f = p(text)
+    assert (f.bp_systolic, f.bp_diastolic, f.bp_unclear) == (150, 100, False), repr(text)
+
+
+def test_keyword_anchored_bp_does_not_weaken_the_unclear_and_date_guards():
+    assert p("बीपी 15 बाय 100").bp_unclear is True          # still implausible -> ask again
+    assert p("बीपी 150").bp_heard == "150"                 # half a BP -> ask again
+    assert p("बीपी नॉर्मल, अगली विज़िट 28/11").bp_unclear is False  # a date is not a BP
+    assert p("बीपी 150/100, अगली विज़िट 28/11").bp_systolic == 150

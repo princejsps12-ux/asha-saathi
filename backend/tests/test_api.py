@@ -204,3 +204,11 @@ def test_phone_mixed_script_transcript_via_api(client):
     assert f["fetal_movement"] == "reduced" and f["symptoms"] == ["swelling"] and body["unclear"] == []
     again = client.post("/api/extract", json={"transcript": PHONE_STT, "base": f}).json()
     assert again["changed"] is False
+
+
+def test_en_mode_stt_bp_via_api(client):
+    from tests.test_stt_mishearings import EN_MODE_STT
+    for text in (EN_MODE_STT, EN_MODE_STT.replace("150/100", "150‎/‎100")):
+        res = client.post("/api/extract", json={"transcript": text}).json()
+        assert (res["fields"]["bp_systolic"], res["fields"]["bp_diastolic"]) == (150, 100)
+        assert res["unclear"] == [] and "BP not clear" not in res["summary_en"]

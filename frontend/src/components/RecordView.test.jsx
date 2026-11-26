@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '../api.js'
 import { loadPending } from '../pendingVisit.js'
 import { listen, speak } from '../speech.js'
+import { LangContext } from '../lang.jsx'
 import RecordView from './RecordView.jsx'
 
 // Each listen() call takes the next scripted utterance; '' means she paused and said nothing.
@@ -265,4 +266,27 @@ describe('dictation with thinking pauses', () => {
     expect(api.extract.mock.calls[0]).toEqual([NOTE])
     expect(screen.getByText(NOTE)).toBeTruthy()
   })
+})
+
+describe('bug: BP after "बीपी" must parse the same in every language mode', () => {
+  const EN_MODE_STT = 'सुनीता साहू 7 महीने बीपी 150/100 पैरों में सूजन है बेबी मूवमेंट कम है अगले हफ्ते फिर आऊंगी'
+  const PARSED = { ...FIELDS, bp_systolic: 150, bp_diastolic: 100, bp_unclear: false, bp_heard: null }
+
+  for (const [mode, sttLang] of [['both', 'hi-IN'], ['hi', 'hi-IN'], ['en', 'en-IN']]) {
+    it(`${mode}: the exact transcript reaches extraction unchanged and BP shows 150/100`, async () => {
+      api.extract.mockResolvedValueOnce(analysisOf(PARSED))
+      script.push(EN_MODE_STT, '', '')
+      render(
+        <LangContext.Provider value={{ mode, setMode: vi.fn() }}>
+          <RecordView {...props} onSaved={vi.fn()} />
+        </LangContext.Provider>,
+      )
+      fireEvent.click(mic())
+      await waitFor(() => expect(api.extract).toHaveBeenCalled())
+      expect(api.extract.mock.calls[0]).toEqual([EN_MODE_STT]) // the UI language never rewrites the text
+      expect(listen.mock.calls[0][0].lang).toBe(sttLang)
+      await waitFor(() => expect(bpRowText()).toContain('150/100'))
+      expect(bpRowText()).not.toMatch(/not clear|समझ नहीं/i)
+    })
+  }
 })

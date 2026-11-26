@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import difflib
 import re
+import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
@@ -95,8 +96,21 @@ def _drop_noise(words: list[str]) -> list[str]:
     return words
 
 
+# Speech engines (especially on phones, mixing Hindi and English) insert invisible direction /
+# joiner marks and look-alike slashes: "150\u200e/\u200e100", "150⁄100". They are invisible on
+# screen but break pattern matching, so they are removed / normalised before anything else.
+_INVISIBLE = re.compile("[\u00ad\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]")
+_SLASHES = str.maketrans({"\u2044": "/", "\u2215": "/", "\u29f8": "/", "\\": "/"})
+
+
+def sanitize(text: str) -> str:
+    """NFKC (full-width digits/slash, odd spaces), drop invisible marks, unify slashes."""
+    text = unicodedata.normalize("NFKC", str(text or ""))
+    return _INVISIBLE.sub("", text).translate(_SLASHES)
+
+
 def _preprocess(text: str) -> str:
-    text = normalize_numbers(text).lower()  # also folds nukta / chandrabindu
+    text = normalize_numbers(sanitize(text)).lower()  # also folds nukta / chandrabindu
     # "8 point 5" / "8 पॉइंट 5" -> 8.5
     text = re.sub(r"(\d+)\s*(?:point|पॉइंट|पॉइन्ट|दशमलव)\s*(\d)", r"\1.\2", text)
     return " ".join(_drop_noise(text.split()))
@@ -246,9 +260,20 @@ def _right_after(text: str, word_end: int, start: int) -> bool:
     return start >= word_end and not re.search(r"[,।;!?]|\.(?!\d)", gap) and len(gap.split()) <= BP_WORD_REACH
 
 
+# "बीपी 150/100", "BP: 150-100", "बीपी 150 100" (the "by" got lost): numbers right after a BP word.
+# Any short separator (or none) is accepted, because the keyword already says it is a BP.
+_BP_ANCHORED = re.compile(
+    rf"{_BP_WORD}\s*(?:का|ka|है|hai|:|-|=)?\s*(\d{{2,3}})\s*(?:[^\w\s]{{1,3}}|{_BP_SEP}|{_UP})?\s*"
+    rf"(?:{_DOWN}\s*)?(\d{{2,3}})(?!\d)")
+
+
 def parse_bp(text: str) -> BpReading:
     """A plausible pair -> the reading. A BP that was spoken but is implausible ("15 बाय 100",
-    "90 by 140", "बीपी 150") -> no values, `heard` set, so the app asks again. Never guesses."""
+    "90 by 140", "बीपी 150") -> no values, `heard` set, so the app asks again. Never guesses.
+    A plausible pair right after "BP"/"बीपी" always wins: no other guard can block it."""
+    for m in _BP_ANCHORED.finditer(text):
+        if _plausible(int(m.group(1)), int(m.group(2))):
+            return BpReading(int(m.group(1)), int(m.group(2)), None)
     matches = [(i, m) for i, pat in enumerate(_BP_PAIRS) for m in pat.finditer(text)]
     for _, m in matches:
         if _plausible(int(m.group(1)), int(m.group(2))):

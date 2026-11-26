@@ -144,3 +144,8 @@ Reported on a phone: transcript "Sunita Sahu सात महीने BP 150 �
 - [x] **Dates:** नरसों (+3), X महीने बाद, more weekday spellings (बृहस्पतिवार, इतवार, somwar…)
 - [x] **Dialect + noise:** Chhattisgarhi/Bhojpuri swelling, headache, bleeding, fever, fetal-movement words and negations (नइ, नइखे); fillers dropped, repeated fragments collapsed
 - [x] Tests: test_hardening.py, syncQueue/draft/honesty tests, RecordView.hardening.test.jsx → 263 pytest + 86 vitest, all in Docker; checked in a 375 px viewport
+
+## BP after keyword in every language mode (2026-11-27)
+- [x] Bug: EN toggle, STT "…बीपी 150/100…" marked "BP not clear". Root cause: phone STT inserts invisible direction/joiner marks (LRM/RLM/ZWSP) and look-alike slashes (⁄ ∕ ／) inside "150/100"; the pair didn't match and the single-number fallback reported "heard 150"
+- [x] Fix: all text is NFKC-normalised, invisible marks removed and slash look-alikes unified before parsing; a plausible pair right after "BP"/"बीपी" (any short separator, or none) always wins over every other guard; implausible values still ask again and dates are still not BP
+- [x] Tests: exact text in all 3 modes (backend parametrised + frontend हिं + EN / हिं / EN: text unchanged, correct STT language, BP 150/100 shown), 12 invisible-mark/separator variants, guards unchanged → 280 pytest + 89 vitest in Docker
