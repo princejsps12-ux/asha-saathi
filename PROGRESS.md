@@ -108,5 +108,8 @@ Every threshold and danger sign in `rules.py` was checked against the actual gov
 - [x] Dropped as sources: PMSMA (no numbers), ASHA Module 7 (child health); ASHA Module 6 host unreachable
 - [x] Tests updated/added (trimester Hb, BP boundaries, fever boundary, Box 7 levels, every rule cites [TAG] p.N with a URL) → 208 pytest pass in Docker
 
-## IN PROGRESS — live deploy
-Waiting for the user to sign in to Render (dashboard.render.com, GitHub login) in Chrome. Not logged in to Hugging Face either. Plan: Render "New Web Service → public Git repo → Docker → Free" via the user's browser login, or Hugging Face Spaces (Docker, `app_port`). First make the Dockerfile HEALTHCHECK use `$PORT` (Render sets PORT). Then put the live link at the top of the README, run Try sample on it, and notify.
+## Live deploy (done 2026-11-27)
+- [x] Live at **https://asha-saathi-0csj.onrender.com** (Render free web service built from the repo's Dockerfile, HTTPS, offline mode, no keys, auto-deploys on push to main, health check `/api/health`)
+- [x] Free instance hours checked: 3.95 of 750 used this month and 22 of 25 services; hours reset on 1 Dec → no risk to staying up until 2 Dec; no other service needs suspending
+- [x] Verified on the live URL: health check and status OK; Try sample → transcript, English gloss, red alerts, Hindi read-back, Yes → saved, and the Due count rose from 2 to 3
+- [x] README links the live demo at the top (notes the free-tier cold start and temporary disk)

@@ -1,5 +1,9 @@
 # आशा साथी · ASHA Saathi
 
+### ▶ Live demo: **https://asha-saathi-0csj.onrender.com**
+HTTPS, so the microphone works; use Chrome or Edge. No login or keys needed. Press **▶ Try sample** if you have no mic.
+*It's hosted on Render's free tier, so after 15 idle minutes the first visit takes about 50 seconds to wake up. The free disk is temporary, so visits you save reset when the instance sleeps or redeploys, and the 5 demo women are re-seeded automatically. For anything persistent, run it locally with `docker compose up`.*
+
 **Voice-first visit register for ASHA workers (called Mitanin in Chhattisgarh).**
 She speaks a home visit in Hindi, Hinglish or English. The app fills the register, reads it back in Hindi, saves it when she says "haan", and raises a red alert when it hears a pregnancy danger sign. She never has to type.
 
