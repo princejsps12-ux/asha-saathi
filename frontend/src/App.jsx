@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from './api.js'
-import { loadLang, saveLang } from './i18n.js'
-import { LangContext, LangToggle, useI18n } from './lang.jsx'
+import { loadMode, mainLang, saveMode } from './i18n.js'
+import { Bi, LangContext, LangToggle, useI18n } from './lang.jsx'
 import RecordView from './components/RecordView.jsx'
 import { DueView, HighRiskView, PeopleList, PersonDetail } from './components/Lists.jsx'
 
@@ -13,23 +13,25 @@ const TABS = [
 ]
 
 function StatusBadges({ status }) {
-  const { t } = useI18n()
+  const { plain } = useI18n()
   if (!status) return null
   if (status.offline_mode) {
-    return <span className="badge badge-offline" title={t('offlineTitle')}>{t('offlineBadge')}</span>
+    return <span className="badge badge-offline" title={plain('offlineTitle')}><Bi k="offlineBadge" /></span>
   }
   return (
     <span className="badge badge-online">
-      {t(status.sarvam_key_set ? 'sttSarvam' : 'sttBrowser')} · {t(status.gemini_key_set ? 'extractGemini' : 'extractRules')}
+      <Bi k={status.sarvam_key_set ? 'sttSarvam' : 'sttBrowser'} inline /> ·{' '}
+      <Bi k={status.gemini_key_set ? 'extractGemini' : 'extractRules'} inline />
     </span>
   )
 }
 
 export default function App() {
-  const [lang, setLangState] = useState(loadLang)
-  const setLang = useCallback((next) => { saveLang(next); setLangState(next) }, [])
-  const langValue = useMemo(() => ({ lang, setLang }), [lang, setLang])
-  useEffect(() => { document.documentElement.lang = lang }, [lang])
+  // Default is always bilingual ('हिं + EN'); the toggle choice is remembered in localStorage.
+  const [mode, setModeState] = useState(loadMode)
+  const setMode = useCallback((next) => { saveMode(next); setModeState(next) }, [])
+  const langValue = useMemo(() => ({ mode, setMode }), [mode, setMode])
+  useEffect(() => { document.documentElement.lang = mainLang(mode) }, [mode])
 
   return (
     <LangContext.Provider value={langValue}>
@@ -39,7 +41,7 @@ export default function App() {
 }
 
 function Shell() {
-  const { lang, t, tOther, pick } = useI18n()
+  const { plain, pick } = useI18n()
   const [tab, setTab] = useState('record')
   const [status, setStatus] = useState(null)
   const [people, setPeople] = useState(null)
@@ -68,7 +70,7 @@ function Shell() {
   const openPerson = (id) => { setOpenId(id); setTab('people') }
   const recordFor = (id) => { setPreset(id); setOpenId(null); setTab('record') }
   const resetDemo = async () => {
-    if (!window.confirm(t('resetConfirm'))) return
+    if (!window.confirm(plain('resetConfirm'))) return
     await api.resetDemo().catch((e) => setFatal(e.message))
     setOpenId(null); refresh()
   }
@@ -81,8 +83,8 @@ function Shell() {
         <div className="brand">
           <img src="/favicon.svg" alt="" width="36" height="36" />
           <div>
-            <h1>{t('appName')}</h1>
-            <small>{tOther('appName')} · {t('tagline')}</small>
+            <h1>आशा साथी</h1>
+            <small>ASHA Saathi · <Bi k="tagline" inline /></small>
           </div>
         </div>
         <div className="topbar-right">
@@ -96,8 +98,10 @@ function Shell() {
         {tab === 'record' && (
           <>
             {presetPerson && (
-              <p className="preset">👩 {t('presetVisit', { name: pick(presetPerson.name_hi, presetPerson.name_en) })}
-                <button type="button" className="link" onClick={() => setPreset(null)}>{t('clear')}</button></p>
+              <p className="preset">
+                <span>👩 <Bi k="presetVisit" inline
+                  vars={{ name: pick(presetPerson.name_hi, presetPerson.name_en) }} /></span>
+                <button type="button" className="link" onClick={() => setPreset(null)}><Bi k="clear" /></button></p>
             )}
             <RecordView status={status} people={people || []} symptomLabels={symptomLabels} samples={samples}
               preset={preset} onSaved={() => { setPreset(null); refresh() }} />
@@ -108,15 +112,15 @@ function Shell() {
             onRecord={recordFor} />
           : (
             <div className="stack">
-              <h2>{t('allWomen')} <span className="en">({people?.length ?? 0})</span></h2>
+              <h2><Bi k="allWomen" inline /> <span className="en">({people?.length ?? 0})</span></h2>
               <PeopleList people={people} today={status?.today} onOpen={setOpenId} emptyKey="noWomen" />
             </div>
           ))}
         {tab === 'due' && <DueView version={version} today={status?.today} onOpen={openPerson} />}
         {tab === 'risk' && <HighRiskView version={version} today={status?.today} onOpen={openPerson} />}
         <footer className="foot">
-          <button type="button" className="link" onClick={resetDemo}>{t('resetDemo')}</button>
-          <span>{t('footerRules')}</span>
+          <button type="button" className="link" onClick={resetDemo}><Bi k="resetDemo" /></button>
+          <Bi k="footerRules" />
         </footer>
       </main>
 
@@ -125,8 +129,7 @@ function Shell() {
           <button key={tb.id} type="button" className={tab === tb.id ? 'tab tab-on' : 'tab'}
             onClick={() => { setTab(tb.id); setOpenId(null) }}>
             <span className="tab-icon">{tb.icon}</span>
-            <span>{t(tb.key)}</span>
-            {lang === 'hi' && <small>{tOther(tb.key)}</small>}
+            <Bi k={tb.key} />
             {tb.id === 'due' && counts.due > 0 && <span className="count">{counts.due}</span>}
             {tb.id === 'risk' && counts.risk > 0 && <span className="count count-red">{counts.risk}</span>}
           </button>

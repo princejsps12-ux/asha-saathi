@@ -14,7 +14,7 @@ function Choice({ options, value, onPick }) {
       {options.map(([val, label]) => (
         <button key={String(val)} type="button" className={`chip ${value === val ? 'chip-on' : ''}`}
           onClick={() => onPick(val)}>
-          {typeof label === 'string' ? label : <Bi hi={label.hi} en={label.en} />}
+          {typeof label === 'string' ? label : <Bi hi={label.hi} en={label.en} always />}
         </button>
       ))}
     </div>
@@ -22,32 +22,31 @@ function Choice({ options, value, onPick }) {
 }
 
 function NumberInput({ value, onCommit, step = 1, placeholder }) {
-  const { t } = useI18n()
   const [draft, setDraft] = useState(value ?? '')
   const commit = () => onCommit(draft === '' ? null : Number(draft))
   return (
     <div className="num-edit">
       <input type="number" inputMode="decimal" step={step} value={draft} placeholder={placeholder} autoFocus
         onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && commit()} />
-      <button type="button" className="btn btn-small" onClick={commit}>{t('ok')}</button>
+      <button type="button" className="btn btn-small" onClick={commit}><Bi k="ok" /></button>
     </div>
   )
 }
 
 function BpInput({ fields, onCommit }) {
-  const { t } = useI18n()
+  const { plain } = useI18n()
   const [sys, setSys] = useState(fields.bp_systolic ?? '')
   const [dia, setDia] = useState(fields.bp_diastolic ?? '')
   const toNum = (v) => (v === '' ? null : Number(v))
   return (
     <div className="num-edit">
-      <input type="number" inputMode="numeric" value={sys} placeholder={t('bpUpper')} autoFocus
+      <input type="number" inputMode="numeric" value={sys} placeholder={plain('bpUpper')} autoFocus
         onChange={(e) => setSys(e.target.value)} />
       <span className="slash">/</span>
-      <input type="number" inputMode="numeric" value={dia} placeholder={t('bpLower')}
+      <input type="number" inputMode="numeric" value={dia} placeholder={plain('bpLower')}
         onChange={(e) => setDia(e.target.value)} />
       <button type="button" className="btn btn-small"
-        onClick={() => onCommit({ bp_systolic: toNum(sys), bp_diastolic: toNum(dia) })}>{t('ok')}</button>
+        onClick={() => onCommit({ bp_systolic: toNum(sys), bp_diastolic: toNum(dia) })}><Bi k="ok" /></button>
     </div>
   )
 }
@@ -55,7 +54,6 @@ function BpInput({ fields, onCommit }) {
 const plain = (v) => (v === null || v === undefined || v === '' ? null : { hi: String(v), en: String(v) })
 
 export default function FieldsCard({ fields, people, symptomLabels, today, onChange, disabled }) {
-  const { t } = useI18n()
   const [open, setOpen] = useState(null)
   const set = (patch) => {
     setOpen(null)
@@ -77,7 +75,7 @@ export default function FieldsCard({ fields, people, symptomLabels, today, onCha
       key: 'f_beneficiary',
       value: person ? { hi: person.name_hi, en: person.name_en }
         : plain(fields.beneficiary_name_en || fields.beneficiary_name),
-      empty: both('select'),
+      emptyKey: 'select',
       editor: <Choice value={fields.beneficiary_id}
         options={people.map((p) => [p.id, { hi: `${p.name_hi} · ${p.village}`, en: `${p.name_en} · ${p.village_en}` }])}
         onPick={(id) => set({ beneficiary_id: id })} />,
@@ -109,12 +107,12 @@ export default function FieldsCard({ fields, people, symptomLabels, today, onCha
     {
       key: 'f_symptoms',
       value: fields.symptoms.length ? { hi: symptomText('hi'), en: symptomText('en') } : null,
-      empty: both('none'),
+      emptyKey: 'none',
       editor: (
         <div className="choices">
           {Object.entries(symptomLabels).map(([code, l]) => (
             <button key={code} type="button" className={`chip ${fields.symptoms.includes(code) ? 'chip-on' : ''}`}
-              onClick={() => toggleSymptom(code)}><Bi hi={l.hi} en={l.en} /></button>
+              onClick={() => toggleSymptom(code)}><Bi hi={l.hi} en={l.en} always /></button>
           ))}
         </div>
       ),
@@ -158,7 +156,7 @@ export default function FieldsCard({ fields, people, symptomLabels, today, onCha
 
   return (
     <section className="card fields">
-      <h3>{t('fieldsTitle')} <span className="en">· {t('tapToEdit')}</span></h3>
+      <h3><Bi k="fieldsTitle" always inline /> <span className="en">· <Bi k="tapToEdit" inline /></span></h3>
       <dl>
         {rows.map((row) => {
           const value = row.value || null
@@ -166,10 +164,10 @@ export default function FieldsCard({ fields, people, symptomLabels, today, onCha
             <div key={row.key} className={`field ${open === row.key ? 'field-open' : ''}`}>
               <button type="button" className="field-row" disabled={disabled}
                 onClick={() => setOpen(open === row.key ? null : row.key)}>
-                <dt><Bi k={row.key} /></dt>
+                <dt><Bi k={row.key} always /></dt>
                 <dd className={value ? '' : 'muted'}>
-                  {value ? <Bi hi={value.hi} en={value.en} />
-                    : row.empty ? <Bi hi={row.empty.hi} en={row.empty.en} /> : t('tapToAdd')}
+                  {value ? <Bi hi={value.hi} en={value.en} always />
+                    : <Bi k={row.emptyKey || 'tapToAdd'} always />}
                 </dd>
               </button>
               {open === row.key && <div className="field-editor">{row.editor}</div>}

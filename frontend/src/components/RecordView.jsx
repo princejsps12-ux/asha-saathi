@@ -8,10 +8,11 @@ import FieldsCard from './FieldsCard.jsx'
 
 // The core flow: speak -> extract -> read back -> confirm by voice -> save -> alert.
 // phase: idle | listening | thinking | speaking | confirming | review | saving | saved
-// The UI language picks the recognition language (hi-IN / en-IN) and the read-back text.
+// The display mode picks recognition + read-back language: Hindi (hi-IN) in 'हिं + EN' and 'हिं',
+// English (en-IN) in 'EN'. The read-back card always shows the summary in the display mode.
 
 export default function RecordView({ status, people, symptomLabels, samples, preset, onSaved }) {
-  const { lang, t, pick } = useI18n()
+  const { lang, t, plain, pick } = useI18n()
   const [phase, setPhase] = useState('idle')
   const [transcript, setTranscriptState] = useState('')
   const [analysis, setAnalysis] = useState(null)
@@ -27,7 +28,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   const canListen = browserSttSupported || useServerStt
   const voice = speechLang(lang)
   const say = (text) => speak(text, voice)
-  const speechError = (code) => (t(`err_${code}`) === `err_${code}` ? t('err_other', { code }) : t(`err_${code}`))
+  const speechError = (code) => (t(`err_${code}`) === `err_${code}` ? plain('err_other', { code }) : plain(`err_${code}`))
 
   const setTranscript = (text) => { transcriptRef.current = text; setTranscriptState(text) }
   const newFlow = () => {
@@ -94,7 +95,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   async function save(result = analysis) {
     newFlow()
     if (result?.fields.beneficiary_id == null) {
-      setError(t('selectFirst')); setPhase('review')
+      setError(plain('selectFirst')); setPhase('review')
       say(t('selectFirst'))
       return
     }
@@ -145,7 +146,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
             const { transcript: text } = await api.stt(blob)
             setTranscript(text); process(text)
           } catch (e) {
-            setError(t('sttFallback', { msg: e.message })); setPhase('idle')
+            setError(plain('sttFallback', { msg: e.message })); setPhase('idle')
           }
         },
       }
@@ -194,7 +195,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
       <div className="mic-zone">
         <button type="button" className={`mic mic-${phase}`} onClick={micPressed}
           disabled={!canListen || busy || phase === 'confirming'}
-          aria-label={t(phase === 'listening' ? 'micStop' : 'micStart')}>
+          aria-label={plain(phase === 'listening' ? 'micStop' : 'micStart')}>
           <svg viewBox="0 0 24 24" aria-hidden>
             {phase === 'listening'
               ? <rect x="7" y="7" width="10" height="10" rx="2" />
@@ -204,13 +205,14 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
         <Bi k={`phase_${phase}`} className="phase" />
         {!canListen && <p className="warn"><Bi k="noStt" /></p>}
         <button type="button" className="btn btn-ghost" onClick={trySample} disabled={busy || phase === 'listening'}>
-          {t('trySample')} {nextSample && <small>({pick(nextSample.label_hi, nextSample.label_en)})</small>}
+          <Bi k="trySample" />
+          {nextSample && <small>(<Bi hi={nextSample.label_hi} en={nextSample.label_en} inline />)</small>}
         </button>
       </div>
 
       {(transcript || phase === 'listening') && (
         <section className="card transcript">
-          <h3>{t('transcriptTitle')}</h3>
+          <h3><Bi k="transcriptTitle" inline /></h3>
           <p>{transcript || <span className="muted">…</span>}{phase === 'listening' && <span className="caret" />}</p>
           {analysis?.gloss_en && (
             <div className="gloss" lang="en">
@@ -227,24 +229,28 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
         <>
           {phase === 'saved' && (
             <div className={`saved-banner risk-${analysis.risk}`}>
-              {t('savedBanner')} — {RISK_ICON[analysis.risk]} <Bi k={`risk_${analysis.risk}`} className="inline" />
+              <Bi k="savedBanner" inline /> — {RISK_ICON[analysis.risk]} <Bi k={`risk_${analysis.risk}`} inline />
             </div>
           )}
           <AlertList alerts={analysis.alerts} />
+          <section className="card readback">
+            <h3>🔊 <Bi k="readbackTitle" inline /></h3>
+            <Bi hi={analysis.summary_hi} en={analysis.summary_en} className="readback-text" />
+          </section>
           {analysis.engine_note && <p className="note">ℹ️ {analysis.engine_note}</p>}
           <FieldsCard fields={analysis.fields} people={people} symptomLabels={symptomLabels} today={status?.today}
             onChange={onFieldsChange} disabled={phase === 'saving' || phase === 'saved'} />
           <div className="actions">
             {phase === 'saved' ? (
-              <button type="button" className="btn btn-primary btn-big" onClick={reset}>{t('newVisit')}</button>
+              <button type="button" className="btn btn-primary btn-big" onClick={reset}><Bi k="newVisit" /></button>
             ) : (
               <>
                 <button type="button" className="btn btn-primary btn-big" onClick={() => save()}
-                  disabled={phase === 'saving' || phase === 'thinking'}>{t('save')}</button>
+                  disabled={phase === 'saving' || phase === 'thinking'}><Bi k="save" /></button>
                 <button type="button" className="btn btn-secondary" onClick={() => readBackAndConfirm(analysis)}
-                  disabled={busy}>{t('readAgain')}</button>
+                  disabled={busy}><Bi k="readAgain" /></button>
                 <button type="button" className="btn btn-secondary" onClick={startMic} disabled={busy || !canListen}>
-                  {t('reRecord')}</button>
+                  <Bi k="reRecord" /></button>
               </>
             )}
           </div>

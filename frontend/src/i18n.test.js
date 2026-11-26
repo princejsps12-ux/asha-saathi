@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { STRINGS, STORAGE_KEY, detectLang, formatDate, loadLang, saveLang, translate } from './i18n.js'
+import {
+  DEFAULT_MODE, MODES, MODE_LABELS, STORAGE_KEY, STRINGS, detectMode, formatDate, linesFor, loadMode, mainLang,
+  saveMode, translate,
+} from './i18n.js'
 
 const memoryStorage = (initial = {}) => {
   const data = { ...initial }
@@ -10,34 +13,54 @@ const brokenStorage = {
   setItem: () => { throw new Error('QuotaExceeded') },
 }
 
-describe('language detection', () => {
-  it('defaults to English when the browser language is not Hindi', () => {
-    expect(detectLang(null, 'en-US')).toBe('en')
-    expect(detectLang(null, 'ta-IN')).toBe('en')
-    expect(detectLang(null, undefined)).toBe('en')
+describe('display mode', () => {
+  it('first open is always bilingual "हिं + EN", whatever the browser language', () => {
+    expect(DEFAULT_MODE).toBe('both')
+    expect(detectMode(null)).toBe('both')
+    expect(loadMode(memoryStorage())).toBe('both')
+    expect(detectMode.length).toBe(1) // takes only the stored value: no browser-language guessing
   })
-  it('defaults to Hindi for a Hindi browser', () => {
-    expect(detectLang(null, 'hi-IN')).toBe('hi')
-    expect(detectLang(null, 'hi')).toBe('hi')
+  it('offers exactly three toggle options in order', () => {
+    expect(MODES).toEqual(['both', 'hi', 'en'])
+    expect(MODES.map((m) => MODE_LABELS[m])).toEqual(['हिं + EN', 'हिं', 'EN'])
   })
-  it('a stored choice always wins, unknown stored values are ignored', () => {
-    expect(detectLang('hi', 'en-US')).toBe('hi')
-    expect(detectLang('en', 'hi-IN')).toBe('en')
-    expect(detectLang('fr', 'hi-IN')).toBe('hi')
+  it('a valid stored choice wins; junk falls back to bilingual', () => {
+    expect(detectMode('hi')).toBe('hi')
+    expect(detectMode('en')).toBe('en')
+    expect(detectMode('fr')).toBe('both')
+  })
+  it('main language is Hindi unless EN-only', () => {
+    expect([mainLang('both'), mainLang('hi'), mainLang('en')]).toEqual(['hi', 'hi', 'en'])
+  })
+})
+
+describe('linesFor (what each label shows)', () => {
+  it('both: Hindi main with a smaller English line', () => {
+    expect(linesFor('both', 'सूजन', 'Swelling')).toEqual({ main: 'सूजन', sub: 'Swelling' })
+  })
+  it('hi: Hindi only, unless the English line is required (fields, alerts)', () => {
+    expect(linesFor('hi', 'सूजन', 'Swelling')).toEqual({ main: 'सूजन', sub: null })
+    expect(linesFor('hi', 'सूजन', 'Swelling', { alwaysEnglish: true })).toEqual({ main: 'सूजन', sub: 'Swelling' })
+  })
+  it('en: English only', () => {
+    expect(linesFor('en', 'सूजन', 'Swelling', { alwaysEnglish: true })).toEqual({ main: 'Swelling', sub: null })
+  })
+  it('no duplicate line when both languages are the same, and fills a missing side', () => {
+    expect(linesFor('both', '142/92', '142/92')).toEqual({ main: '142/92', sub: null })
+    expect(linesFor('en', 'केवल हिंदी', '')).toEqual({ main: 'केवल हिंदी', sub: null })
   })
 })
 
 describe('localStorage persistence', () => {
   it('saves and reloads the choice', () => {
     const storage = memoryStorage()
-    saveLang('hi', storage)
-    expect(storage.data[STORAGE_KEY]).toBe('hi')
-    expect(loadLang(storage, { language: 'en-GB' })).toBe('hi')
+    saveMode('en', storage)
+    expect(storage.data[STORAGE_KEY]).toBe('en')
+    expect(loadMode(storage)).toBe('en')
   })
-  it('never throws when storage is blocked (private mode)', () => {
-    expect(() => saveLang('en', brokenStorage)).not.toThrow()
-    expect(loadLang(brokenStorage, { language: 'hi-IN' })).toBe('hi')
-    expect(loadLang(brokenStorage, { language: 'en-US' })).toBe('en')
+  it('never throws when storage is blocked (private mode) and stays bilingual', () => {
+    expect(() => saveMode('en', brokenStorage)).not.toThrow()
+    expect(loadMode(brokenStorage)).toBe('both')
   })
 })
 

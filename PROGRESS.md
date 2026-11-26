@@ -52,3 +52,13 @@ Resume rule: if work is interrupted, read this file first and continue from the 
 - `docker compose up` → built from scratch, container healthy, logs print `open http://localhost:8000`, offline mode
 - UI: Try sample → fields + red alert with reasons → Hindi read-back → save → due-tomorrow and risk counts update
 - `docker compose run --rm app pytest` → 111 passed
+
+## Language (added 2026-11-27, revised same day)
+- [x] Default view on first open is always bilingual **हिं + EN**: Hindi main text, smaller English line under every label, button, alert and the read-back summary (no browser-language guessing)
+- [x] Header toggle with 3 options: **हिं + EN** (default) · **हिं** · **EN**, remembered in localStorage (safe when storage is blocked)
+- [x] EN mode: all UI, alerts and read-back in English; speech recognition and TTS switch to en-IN
+- [x] Register fields and danger alerts keep an English line under the Hindi even in Hindi-only mode
+- [x] Transcript card shows an English gloss built from the extracted fields (works offline)
+- [x] Backend: alerts carry Hindi + English reason and action; English read-back + gloss (`summary_en`, `gloss_en`)
+- [x] Tests: 116 pytest (bilingual output, English spoken visit, yes/no in Devanagari) + 16 vitest (modes, default, persistence, key parity); vitest runs in the Docker build
+- [x] README demo steps updated with the toggle

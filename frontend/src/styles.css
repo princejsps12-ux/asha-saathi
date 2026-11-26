@@ -234,3 +234,15 @@ h1, h2, h3 { margin: 0; }
   .app { padding-top: 12px; }
   .topbar { border-radius: var(--radius); margin: 0 12px; }
 }
+
+/* Read-back summary card: Hindi summary with the English summary underneath. */
+.readback h3 { font-size: .9rem; }
+.readback-text .bi-main { font-size: 1rem; }
+.readback-text .bi-sub { font-size: .88rem; margin-top: 6px; line-height: 1.35; }
+.tab .bi { align-items: center; font-size: .85rem; }
+.tab .bi-sub { font-size: .65rem; }
+.badge .bi-sub { color: rgba(255, 255, 255, .8); font-size: .9em; }
+.badge-online .bi-sub { color: #3b2500; }
+.due .bi { display: inline-flex; vertical-align: top; text-align: right; }
+.lang-toggle button { min-width: 40px; padding: 0 9px; }
+.topbar .bi-sub { color: rgba(255, 255, 255, .78); }

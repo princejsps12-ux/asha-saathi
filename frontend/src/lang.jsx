@@ -1,51 +1,63 @@
 import { createContext, useContext } from 'react'
-import { formatDate, otherLang, translate } from './i18n.js'
+import { DEFAULT_MODE, MODES, MODE_LABELS, formatDate, linesFor, mainLang, translate } from './i18n.js'
 
-export const LangContext = createContext({ lang: 'hi', setLang: () => {} })
+export const LangContext = createContext({ mode: DEFAULT_MODE, setMode: () => {} })
 
-/** t('key') in the current language; tOther('key') in the other one (for the secondary line). */
+/**
+ * Hook for components.
+ *  - lang: language of the main line ('hi' or 'en') — also drives speech recognition / TTS
+ *  - t(key): main-language text, for places that render a <Bi> sub-line themselves
+ *  - plain(key): one string for attributes/dialogs that can't hold two lines
+ *    ("हिंदी / English" in bilingual mode)
+ */
 export function useI18n() {
-  const { lang, setLang } = useContext(LangContext)
-  const other = otherLang(lang)
+  const { mode, setMode } = useContext(LangContext)
+  const lang = mainLang(mode)
+  const joined = (hi, en) => {
+    const { main, sub } = linesFor(mode, hi, en)
+    return sub ? `${main} / ${sub}` : main
+  }
   return {
+    mode,
+    setMode,
     lang,
-    setLang,
     t: (key, vars) => translate(lang, key, vars),
-    tOther: (key, vars) => translate(other, key, vars),
+    plain: (key, vars) => joined(translate('hi', key, vars), translate('en', key, vars)),
+    plainText: joined,
+    pick: (hi, en) => linesFor(mode, hi, en).main,
     fmtDate: (iso, today) => formatDate(iso, today, lang),
-    pick: (hi, en) => (lang === 'hi' ? hi : en) || hi || en,
   }
 }
 
 /**
- * A two-line bilingual label: the current language on top, the other below in small text.
- * Hindi-first users always see an English line too (and vice versa), so a judge or a
- * supervisor can read any card. Pass either a translation key, or explicit hi/en text.
+ * Bilingual text. Main line in Hindi (or English in EN mode); in 'हिं + EN' mode a smaller
+ * English line sits underneath. Pass a translation key (k + vars) or explicit hi/en text.
+ * `always` keeps the English line even in Hindi-only mode (register fields, danger alerts).
  */
-export function Bi({ k, vars, hi, en, className = '' }) {
-  const { lang } = useContext(LangContext)
-  const text = {
-    hi: hi ?? translate('hi', k, vars),
-    en: en ?? translate('en', k, vars),
-  }
-  const main = text[lang] || text.hi || text.en
-  const sub = text[otherLang(lang)]
+export function Bi({ k, vars, hi, en, always = false, inline = false, className = '' }) {
+  const { mode } = useContext(LangContext)
+  const { main, sub } = linesFor(
+    mode,
+    hi ?? (k ? translate('hi', k, vars) : ''),
+    en ?? (k ? translate('en', k, vars) : ''),
+    { alwaysEnglish: always },
+  )
   return (
-    <span className={`bi ${className}`}>
+    <span className={`bi ${inline ? 'inline' : ''} ${className}`}>
       <span className="bi-main">{main}</span>
-      {sub && sub !== main && <span className="bi-sub" lang={otherLang(lang)}>{sub}</span>}
+      {sub && <span className="bi-sub" lang="en">{sub}</span>}
     </span>
   )
 }
 
-/** EN | हिं segmented toggle for the header. */
+/** "हिं + EN | हिं | EN" segmented toggle for the header. */
 export function LangToggle() {
-  const { lang, setLang } = useContext(LangContext)
+  const { mode, setMode } = useContext(LangContext)
   return (
-    <div className="lang-toggle" role="group" aria-label={translate(lang, 'langToggle')}>
-      {[['en', 'EN'], ['hi', 'हिं']].map(([code, label]) => (
-        <button key={code} type="button" lang={code} aria-pressed={lang === code}
-          className={lang === code ? 'on' : ''} onClick={() => setLang(code)}>{label}</button>
+    <div className="lang-toggle" role="group" aria-label="भाषा / Language">
+      {MODES.map((m) => (
+        <button key={m} type="button" aria-pressed={mode === m} className={mode === m ? 'on' : ''}
+          onClick={() => setMode(m)}>{MODE_LABELS[m]}</button>
       ))}
     </div>
   )

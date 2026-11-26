@@ -1,26 +1,46 @@
-// UI language: Hindi-first for ASHA workers, English for everyone else (e.g. judges).
-// Pure functions only (no React) so they are unit-tested in i18n.test.js.
+// Display language. Pure functions only (no React) so they are unit-tested in i18n.test.js.
+//
+// Three modes, chosen with the header toggle and remembered in localStorage:
+//   'both' (default) — Hindi as the main text, a smaller English line under it
+//   'hi'             — Hindi only (an ASHA's everyday view)
+//   'en'             — English only (judges, supervisors who don't read Hindi)
+// The default is ALWAYS 'both' on first open; we never guess from the browser language.
 
-export const LANGS = ['hi', 'en']
+export const MODES = ['both', 'hi', 'en']
+export const DEFAULT_MODE = 'both'
+export const MODE_LABELS = { both: 'हिं + EN', hi: 'हिं', en: 'EN' }
 export const STORAGE_KEY = 'asha.lang'
 
-/** Stored choice wins; otherwise Hindi only if the browser's language is Hindi. */
-export function detectLang(stored, browserLanguage) {
-  if (LANGS.includes(stored)) return stored
-  return String(browserLanguage || '').toLowerCase().startsWith('hi') ? 'hi' : 'en'
+/** A valid stored choice wins; anything else (nothing stored, junk) means the bilingual default. */
+export function detectMode(stored) {
+  return MODES.includes(stored) ? stored : DEFAULT_MODE
 }
 
-export function loadLang(storage = globalThis.localStorage, nav = globalThis.navigator) {
+export function loadMode(storage = globalThis.localStorage) {
   let stored = null
   try { stored = storage?.getItem(STORAGE_KEY) } catch { /* private mode / blocked storage */ }
-  return detectLang(stored, nav?.language)
+  return detectMode(stored)
 }
 
-export function saveLang(lang, storage = globalThis.localStorage) {
-  try { storage?.setItem(STORAGE_KEY, lang) } catch { /* ignore: preference just won't persist */ }
+export function saveMode(mode, storage = globalThis.localStorage) {
+  try { storage?.setItem(STORAGE_KEY, mode) } catch { /* ignore: preference just won't persist */ }
 }
 
-export const otherLang = (lang) => (lang === 'hi' ? 'en' : 'hi')
+/** Language of the main line: English only in 'en' mode, otherwise Hindi. */
+export const mainLang = (mode) => (mode === 'en' ? 'en' : 'hi')
+
+/**
+ * Which lines to show for a piece of text that exists in Hindi and English.
+ * `alwaysEnglish` keeps an English line under the Hindi even in Hindi-only mode — used for
+ * the register fields and danger alerts, which a supervisor or doctor must always be able to read.
+ */
+export function linesFor(mode, hi, en, { alwaysEnglish = false } = {}) {
+  const h = hi || en || ''
+  const e = en || hi || ''
+  if (mode === 'en') return { main: e, sub: null }
+  const showSub = mode === 'both' || alwaysEnglish
+  return { main: h, sub: showSub && e !== h ? e : null }
+}
 
 export const STRINGS = {
   hi: {
@@ -32,7 +52,8 @@ export const STRINGS = {
     sttBrowser: '🎙 ब्राउज़र आवाज़',
     extractGemini: '✨ Gemini + नियम',
     extractRules: 'नियम',
-    langToggle: 'भाषा बदलें / Switch language',
+    langToggle: 'भाषा',
+    readbackTitle: 'सुनाया गया सार',
     tabVisit: 'विज़िट', tabWomen: 'लाभार्थी', tabDue: 'कल', tabRisk: 'हाई रिस्क',
     resetDemo: '↺ डेमो डेटा रीसेट करें',
     resetConfirm: 'डेमो डेटा रीसेट करें? सेव की गई विज़िट हट जाएँगी।',
@@ -109,7 +130,8 @@ export const STRINGS = {
     sttBrowser: '🎙 browser STT',
     extractGemini: '✨ Gemini + rules',
     extractRules: 'rules',
-    langToggle: 'Switch language / भाषा बदलें',
+    langToggle: 'Language',
+    readbackTitle: 'Read-back summary',
     tabVisit: 'Visit', tabWomen: 'Women', tabDue: 'Due', tabRisk: 'High risk',
     resetDemo: '↺ Reset demo data',
     resetConfirm: 'Reset demo data? Saved visits will be removed.',

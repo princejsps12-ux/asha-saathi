@@ -18,12 +18,14 @@ The cost of a late entry is clinical, not clerical. **High BP, bleeding, severe 
 ## 1-minute demo
 
 1. `docker compose up` → open **http://localhost:8000** (use Chrome or Edge for the microphone).
-2. Tap **▶ Try sample** (no microphone needed). A Hindi visit note for *रेखा वर्मा* is typed out like live dictation.
-3. Watch the fields fill in: month 5, BP 142/92, swelling + headache, IFA yes, Td-2, next visit *kal*.
-4. A **red alert** appears: *High BP* + *Pre-eclampsia warning signs*. Each alert says **why** it fired (`BP 142/92 ≥ 140/90`) and **which guideline** it comes from.
-5. The app **reads the summary aloud in Hindi** and listens for **"haan" / "nahi"**. Say *haan*, or tap **✓ Save**.
-6. Open **📅 कल (Due)**: Rekha now appears in *due tomorrow*. Open **⚠️ Risk**: she is on the high-risk list.
-7. With a mic: tap the big button and say something like
+2. **Language:** the app opens in **हिं + EN** — Hindi as the main text with a smaller English line under every label, button, alert and the read-back summary. Use the header toggle **हिं + EN | हिं | EN** to switch to Hindi-only (an ASHA's everyday view) or English-only (judges). The choice is remembered in the browser (localStorage). The first open is always bilingual; it never guesses from the browser language.
+3. Tap **▶ Try sample** (no microphone needed). A Hindi visit note for *रेखा वर्मा* is typed out like live dictation.
+4. Watch the fields fill in: month 5, BP 142/92, swelling + headache, IFA yes, Td-2, next visit *kal*.
+5. A **red alert** appears: *High BP* + *Pre-eclampsia warning signs*. Each alert says **why** it fired (`BP 142/92 ≥ 140/90`) and **which guideline** it comes from.
+6. Under the Hindi transcript, an **English gloss** of the extracted visit appears (built from the extracted fields, so it works offline). The **read-back summary** card shows the Hindi summary with the English one underneath.
+7. The app **reads the summary aloud** (Hindi in हिं + EN / हिं, English in EN) and listens for **"haan" / "nahi"** (or *yes* / *no*). Say *haan*, or tap **✓ Save**.
+8. Open **📅 कल (Due)**: Rekha now appears in *due tomorrow*. Open **⚠️ Risk**: she is on the high-risk list.
+9. With a mic: tap the big button and say something like
    *"Sunita Sahu, saat mahine, BP 150 by 100, pairon mein sujan hai, baby movement kam hai, agle hafte phir aaungi"*.
 
 If something was misheard, tap that field to fix it. Most fields are big tap-buttons (month 1–9, symptoms, dates like कल/परसों), so even corrections rarely need typing.
@@ -61,7 +63,8 @@ flowchart LR
 | Speech-to-text | Browser **Web Speech API** (`hi-IN`) | Free, no key, handles Hindi and Hinglish well in Chrome |
 | Extraction | Own **rule-based parser** ([`backend/app/parser.py`](backend/app/parser.py), [`numbers.py`](backend/app/numbers.py)) | Deterministic, testable, works with no key, no per-call cost |
 | Clinical logic | [`backend/app/rules.py`](backend/app/rules.py) | Every threshold in one file, each with a citation |
-| Read-back | Browser `speechSynthesis` (`hi-IN`) | Free, on-device |
+| Read-back | Browser `speechSynthesis` (`hi-IN`, or `en-IN` in EN mode) | Free, on-device |
+| Language | Own i18n layer ([`frontend/src/i18n.js`](frontend/src/i18n.js)): **हिं + EN** (default) · **हिं** · **EN** | Hindi-first for ASHAs, readable by anyone. Register fields and danger alerts keep an English line even in Hindi-only mode |
 | Backend | FastAPI + SQLite (stdlib `sqlite3`) | One container, one file DB, zero setup |
 | Frontend | React 18 + Vite, hand-written CSS | Fast, small bundle (~55 kB gzip), mobile-first |
 
@@ -162,11 +165,13 @@ Other useful commands:
 
 ## Tests
 
-111 pytest cases, all run inside the container:
+**116 pytest cases + 16 frontend (vitest) cases**, all run inside Docker. The pytest suite runs with `docker compose run --rm app pytest`; the vitest suite runs on every `docker compose build`, and a failing test fails the build:
 
 - `tests/test_parser.py`: one block per parser rule. Hindi number words, Devanagari digits, every BP format, months/weeks, symptoms with negation, bleeding vs anaemia vs blood test, fetal movement, IFA, Td, every date phrase, Hb/temperature/weight, name matching, and full Hindi and Hinglish sentences.
 - `tests/test_rules.py`: every danger rule, including boundary values (139/89 vs 140/90, Hb 6.8/7.0/10.9/11.0, month 4 vs 5), alert ordering, and a check that every rule cites a source.
-- `tests/test_api.py`: the end-to-end pipeline, persistence, the due-tomorrow and high-risk lists, validation errors, alerts recomputed server-side, offline status, Sarvam with no key (503, no crash), and Gemini both timing out (falls back to the parser) and succeeding (validated merge).
+- `tests/test_api.py`: the end-to-end pipeline, the bilingual output (English gloss, English read-back, Hindi + English alert reasons and actions), a fully English spoken visit, persistence, the due-tomorrow and high-risk lists, validation errors, alerts recomputed server-side, offline status, Sarvam with no key (503, no crash), and Gemini both timing out (falls back to the parser) and succeeding (validated merge).
+
+- `frontend/src/i18n.test.js`: the default is always bilingual (with nothing stored, and with junk stored), the three toggle options, localStorage save/reload (including blocked storage in private mode), what each mode shows (`linesFor`), Hindi/English key parity, matching placeholders, no Devanagari in English strings, and dates in both languages.
 
 ## Project structure
 
@@ -186,9 +191,11 @@ asha-saathi/
 │   │   ├── seed.py         5 demo beneficiaries + sample sentences
 │   │   ├── main.py         FastAPI routes
 │   │   └── serve.py        entrypoint, prints the app URL
-│   └── tests/              111 pytest cases
+│   └── tests/              116 pytest cases
 └── frontend/src/
-    ├── speech.js           Web Speech recognition, Hindi TTS, recorder
+    ├── i18n.js             हिं + EN / हिं / EN modes, all UI strings, localStorage (+ i18n.test.js)
+    ├── lang.jsx            <Bi> two-line label and the language toggle
+    ├── speech.js           Web Speech recognition, Hindi/English TTS, recorder
     ├── components/RecordView.jsx   mic → extract → read-back → confirm → save
     ├── components/FieldsCard.jsx   tap-to-edit register fields
     ├── components/AlertList.jsx    danger alerts with "why" + source
