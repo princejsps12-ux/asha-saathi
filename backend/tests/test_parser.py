@@ -178,6 +178,7 @@ def test_beneficiary_match(text, bid):
 @pytest.mark.parametrize("text,intent", [
     ("हाँ", "yes"), ("haan sahi hai", "yes"), ("हाँ सेव करना", "yes"), ("yes", "yes"),
     ("नहीं", "no"), ("nahi galat hai", "no"), ("सही नहीं है", "no"), ("hmm", "unknown"),
+    ("यस", "yes"), ("ओके सेव", "yes"), ("नो", "no"),  # English words as a hi-IN recogniser writes them
 ])
 def test_confirmation_intent(text, intent):
     assert classify_confirmation(text) == intent

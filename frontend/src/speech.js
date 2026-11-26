@@ -5,13 +5,8 @@ export const browserSttSupported = Boolean(Recognition)
 export const ttsSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
 export const recorderSupported = typeof window !== 'undefined' && 'MediaRecorder' in window
 
-const ERROR_TEXT = {
-  'not-allowed': 'माइक की अनुमति नहीं मिली / Microphone permission denied',
-  'no-speech': 'कुछ सुनाई नहीं दिया / No speech heard',
-  'audio-capture': 'माइक नहीं मिला / No microphone found',
-  network: 'इंटरनेट नहीं है — आवाज़ पहचान के लिए नेट चाहिए / Speech service needs internet',
-}
-export const speechErrorText = (code) => ERROR_TEXT[code] || `आवाज़ पहचान में दिक्कत / Speech error: ${code}`
+/** BCP-47 tag for speech in the UI language. Indian English still copes with Hinglish words. */
+export const speechLang = (uiLang) => (uiLang === 'en' ? 'en-IN' : 'hi-IN')
 
 /**
  * Start listening. Stops on its own after `silenceMs` of quiet.
@@ -75,16 +70,17 @@ export async function recordAudio() {
   }
 }
 
-function hindiVoice() {
+function voiceFor(tag) {
   const voices = window.speechSynthesis.getVoices()
-  return voices.find((v) => v.lang === 'hi-IN') || voices.find((v) => v.lang?.startsWith('hi'))
+  const base = tag.split('-')[0]
+  return voices.find((v) => v.lang === tag) || voices.find((v) => v.lang?.startsWith(base))
 }
 
 /**
- * Speak Hindi text. Chrome cuts off long utterances, so we queue one sentence at a time.
- * Resolves when finished (or immediately if TTS is unavailable).
+ * Speak text in `tag` (hi-IN or en-IN). Chrome cuts off long utterances, so we queue one
+ * sentence at a time. Resolves when finished (or immediately if TTS is unavailable).
  */
-export function speak(text) {
+export function speak(text, tag = 'hi-IN') {
   if (!ttsSupported || !text) return Promise.resolve()
   const synth = window.speechSynthesis
   synth.cancel()
@@ -98,9 +94,9 @@ export function speak(text) {
       if (index >= sentences.length) return done()
       const sentence = sentences[index++]
       const u = new SpeechSynthesisUtterance(sentence)
-      u.lang = 'hi-IN'
+      u.lang = tag
       u.rate = 0.95
-      const voice = hindiVoice()
+      const voice = voiceFor(tag)
       if (voice) u.voice = voice
       u.onend = next
       u.onerror = done

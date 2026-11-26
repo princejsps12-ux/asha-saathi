@@ -1,29 +1,45 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api } from './api.js'
+import { loadLang, saveLang } from './i18n.js'
+import { LangContext, LangToggle, useI18n } from './lang.jsx'
 import RecordView from './components/RecordView.jsx'
 import { DueView, HighRiskView, PeopleList, PersonDetail } from './components/Lists.jsx'
 
 const TABS = [
-  { id: 'record', icon: '🎤', hi: 'विज़िट', en: 'Visit' },
-  { id: 'people', icon: '👩', hi: 'लाभार्थी', en: 'Women' },
-  { id: 'due', icon: '📅', hi: 'कल', en: 'Due' },
-  { id: 'risk', icon: '⚠️', hi: 'हाई रिस्क', en: 'Risk' },
+  { id: 'record', icon: '🎤', key: 'tabVisit' },
+  { id: 'people', icon: '👩', key: 'tabWomen' },
+  { id: 'due', icon: '📅', key: 'tabDue' },
+  { id: 'risk', icon: '⚠️', key: 'tabRisk' },
 ]
 
 function StatusBadges({ status }) {
+  const { t } = useI18n()
   if (!status) return null
   if (status.offline_mode) {
-    return <span className="badge badge-offline" title="Browser speech + rule-based parser. No API key needed.">
-      🔌 key not set – offline mode</span>
+    return <span className="badge badge-offline" title={t('offlineTitle')}>{t('offlineBadge')}</span>
   }
   return (
     <span className="badge badge-online">
-      {status.sarvam_key_set ? '🎙 Sarvam STT' : '🎙 browser STT'} · {status.gemini_key_set ? '✨ Gemini + rules' : 'rules'}
+      {t(status.sarvam_key_set ? 'sttSarvam' : 'sttBrowser')} · {t(status.gemini_key_set ? 'extractGemini' : 'extractRules')}
     </span>
   )
 }
 
 export default function App() {
+  const [lang, setLangState] = useState(loadLang)
+  const setLang = useCallback((next) => { saveLang(next); setLangState(next) }, [])
+  const langValue = useMemo(() => ({ lang, setLang }), [lang, setLang])
+  useEffect(() => { document.documentElement.lang = lang }, [lang])
+
+  return (
+    <LangContext.Provider value={langValue}>
+      <Shell />
+    </LangContext.Provider>
+  )
+}
+
+function Shell() {
+  const { lang, t, tOther, pick } = useI18n()
   const [tab, setTab] = useState('record')
   const [status, setStatus] = useState(null)
   const [people, setPeople] = useState(null)
@@ -52,7 +68,7 @@ export default function App() {
   const openPerson = (id) => { setOpenId(id); setTab('people') }
   const recordFor = (id) => { setPreset(id); setOpenId(null); setTab('record') }
   const resetDemo = async () => {
-    if (!window.confirm('डेमो डेटा रीसेट करें? / Reset demo data?')) return
+    if (!window.confirm(t('resetConfirm'))) return
     await api.resetDemo().catch((e) => setFatal(e.message))
     setOpenId(null); refresh()
   }
@@ -65,11 +81,14 @@ export default function App() {
         <div className="brand">
           <img src="/favicon.svg" alt="" width="36" height="36" />
           <div>
-            <h1>आशा साथी</h1>
-            <small>ASHA Saathi · मितानिन की आवाज़ वाली डायरी</small>
+            <h1>{t('appName')}</h1>
+            <small>{tOther('appName')} · {t('tagline')}</small>
           </div>
         </div>
-        <StatusBadges status={status} />
+        <div className="topbar-right">
+          <LangToggle />
+          <StatusBadges status={status} />
+        </div>
       </header>
 
       <main className="content">
@@ -77,8 +96,8 @@ export default function App() {
         {tab === 'record' && (
           <>
             {presetPerson && (
-              <p className="preset">👩 {presetPerson.name_hi} की विज़िट
-                <button type="button" className="link" onClick={() => setPreset(null)}>✕ हटाएँ</button></p>
+              <p className="preset">👩 {t('presetVisit', { name: pick(presetPerson.name_hi, presetPerson.name_en) })}
+                <button type="button" className="link" onClick={() => setPreset(null)}>{t('clear')}</button></p>
             )}
             <RecordView status={status} people={people || []} symptomLabels={symptomLabels} samples={samples}
               preset={preset} onSaved={() => { setPreset(null); refresh() }} />
@@ -89,27 +108,27 @@ export default function App() {
             onRecord={recordFor} />
           : (
             <div className="stack">
-              <h2>सभी लाभार्थी <span className="en">All beneficiaries ({people?.length ?? 0})</span></h2>
-              <PeopleList people={people} today={status?.today} onOpen={setOpenId} empty="कोई लाभार्थी नहीं" />
+              <h2>{t('allWomen')} <span className="en">({people?.length ?? 0})</span></h2>
+              <PeopleList people={people} today={status?.today} onOpen={setOpenId} emptyKey="noWomen" />
             </div>
           ))}
         {tab === 'due' && <DueView version={version} today={status?.today} onOpen={openPerson} />}
         {tab === 'risk' && <HighRiskView version={version} today={status?.today} onOpen={openPerson} />}
         <footer className="foot">
-          <button type="button" className="link" onClick={resetDemo}>↺ Reset demo data</button>
-          <span>Rules: MoHFW / NHM ANC guidelines · decision support only</span>
+          <button type="button" className="link" onClick={resetDemo}>{t('resetDemo')}</button>
+          <span>{t('footerRules')}</span>
         </footer>
       </main>
 
       <nav className="tabbar">
-        {TABS.map((t) => (
-          <button key={t.id} type="button" className={tab === t.id ? 'tab tab-on' : 'tab'}
-            onClick={() => { setTab(t.id); setOpenId(null) }}>
-            <span className="tab-icon">{t.icon}</span>
-            <span>{t.hi}</span>
-            <small>{t.en}</small>
-            {t.id === 'due' && counts.due > 0 && <span className="count">{counts.due}</span>}
-            {t.id === 'risk' && counts.risk > 0 && <span className="count count-red">{counts.risk}</span>}
+        {TABS.map((tb) => (
+          <button key={tb.id} type="button" className={tab === tb.id ? 'tab tab-on' : 'tab'}
+            onClick={() => { setTab(tb.id); setOpenId(null) }}>
+            <span className="tab-icon">{tb.icon}</span>
+            <span>{t(tb.key)}</span>
+            {lang === 'hi' && <small>{tOther(tb.key)}</small>}
+            {tb.id === 'due' && counts.due > 0 && <span className="count">{counts.due}</span>}
+            {tb.id === 'risk' && counts.risk > 0 && <span className="count count-red">{counts.risk}</span>}
           </button>
         ))}
       </nav>

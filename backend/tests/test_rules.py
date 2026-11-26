@@ -26,6 +26,7 @@ def test_bp_thresholds(sys_, dia, expected):
 def test_alert_reason_contains_measured_values():
     alert = evaluate(VisitFields(bp_systolic=146, bp_diastolic=94))[0]
     assert "146/94" in alert.reason and "140/90" in alert.reason and alert.source
+    assert "146/94" in alert.reason_hi and alert.action_en and alert.action_hi  # bilingual
 
 
 def test_preeclampsia_combo_suppresses_single_symptom_alerts():

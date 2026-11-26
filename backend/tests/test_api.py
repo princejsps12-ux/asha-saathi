@@ -123,3 +123,25 @@ def test_demo_reset_restores_seed(client):
     client.post("/api/visits", json={"fields": {"beneficiary_id": 1}})
     assert client.post("/api/demo/reset").json()["beneficiaries"] == 5
     assert all(p["visit_count"] >= 1 for p in client.get("/api/beneficiaries").json())
+
+
+def test_bilingual_analysis_english_gloss_and_readback(client):
+    res = client.post("/api/extract", json={"transcript": SAMPLES[0]["text"]}).json()
+    assert res["fields"]["beneficiary_name_en"] == "Rekha Verma"
+    gloss = res["gloss_en"]
+    for part in ("Rekha Verma", "5 months pregnant", "BP 142/92", "swelling (feet)", "headache",
+                 "Taking IFA tablets", "Td 2nd dose given", "Next visit tomorrow", "Danger sign: High BP"):
+        assert part in gloss
+    assert "?" not in gloss  # gloss is a statement; the question is only in the read-back
+    assert res["summary_en"].startswith(gloss) and res["summary_en"].endswith("Say yes or no.")
+    assert all(any("ऀ" <= ch <= "ॿ" for ch in s) for s in (res["summary_hi"],))
+    alert = res["alerts"][0]
+    assert alert["reason"] and alert["reason_hi"] and alert["action_en"] and alert["action_hi"]
+
+
+def test_english_spoken_visit_end_to_end(client):
+    text = "Geeta Yadav, 8 months pregnant, BP 150 over 100, baby is not moving much, bleeding since morning"
+    res = client.post("/api/extract", json={"transcript": text}).json()
+    codes = {a["code"] for a in res["alerts"]}
+    assert {"hypertension", "reduced_fetal_movement", "bleeding"} <= codes
+    assert "Geeta Yadav" in res["gloss_en"]

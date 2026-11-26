@@ -18,7 +18,7 @@ from .rules import evaluate, risk_level
 from .schemas import (SYMPTOM_LABELS, Analysis, EvaluateRequest, ExtractRequest, IntentRequest,
                       VisitCreate, VisitFields)
 from .seed import SAMPLES, refresh_stale_demo, seed
-from .summary import build_summary
+from .summary import build_gloss_en, build_summary, build_summary_en
 
 log = logging.getLogger("asha")
 MAX_AUDIO_BYTES = 10 * 1024 * 1024  # ~10 MB is several minutes of compressed speech
@@ -41,13 +41,15 @@ def create_app(settings: Optional[Settings] = None) -> FastAPI:
             person = db.get_beneficiary(fields.beneficiary_id)
             if person is None:
                 raise HTTPException(404, "Beneficiary not found")
-            fields.beneficiary_name = person["name_hi"]
-        else:
-            fields.beneficiary_name = None  # never show a stale name for an unselected woman
+            fields.beneficiary_name, fields.beneficiary_name_en = person["name_hi"], person["name_en"]
+        else:  # never show a stale name for an unselected woman
+            fields.beneficiary_name = fields.beneficiary_name_en = None
         alerts = evaluate(fields)
+        today = settings.today()
         return Analysis(fields=fields, alerts=alerts, risk=risk_level(alerts),
-                        summary_hi=build_summary(fields, alerts, settings.today()), engine=engine,
-                        engine_note=note)
+                        summary_hi=build_summary(fields, alerts, today),
+                        summary_en=build_summary_en(fields, alerts, today),
+                        gloss_en=build_gloss_en(fields, alerts, today), engine=engine, engine_note=note)
 
     @app.exception_handler(Exception)
     async def unhandled(_: Request, exc: Exception) -> JSONResponse:  # never leak a stack trace to the UI

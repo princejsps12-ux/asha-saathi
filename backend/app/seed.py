@@ -36,20 +36,23 @@ BENEFICIARIES = [
 SAMPLES = [
     {
         "id": "hindi_red",
-        "label": "हिंदी — खतरे के संकेत",
+        "label_hi": "हिंदी — खतरे के संकेत",
+        "label_en": "Hindi — danger signs",
         "text": "रेखा वर्मा के घर गई। पांच महीने की गर्भवती है। बीपी एक सौ बयालीस बटा बानवे है, "
                 "पैरों में सूजन और सिर दर्द की शिकायत है। बच्चे की हलचल ठीक है। आयरन की गोली रोज़ ले रही है, "
                 "टीडी का दूसरा टीका लगा। अगली विज़िट कल।",
     },
     {
         "id": "hinglish_amber",
-        "label": "Hinglish — anaemia",
+        "label_hi": "हिंग्लिश — खून की कमी",
+        "label_en": "Hinglish — anaemia",
         "text": "Sunita Sahu, saat mahine ki pregnant hai, BP 120 by 80, koi sujan nahi, baby movement theek hai, "
                 "Hb saadhe nau, iron ki goli le rahi hai, agle hafte phir aaungi",
     },
     {
         "id": "english_bleeding",
-        "label": "English — bleeding",
+        "label_hi": "अंग्रेज़ी — खून आना",
+        "label_en": "English — bleeding",
         "text": "Kamla Dhruw, 4 months pregnant, BP 150 upar 100 neeche, some bleeding since morning, "
                 "not taking iron tablets, next visit in 2 days",
     },

@@ -96,7 +96,8 @@ FACE_HAND_TERMS = ("चेहर", "मुंह", "हाथ", "हाथों
                    "chehre", "munh")
 
 FETAL_TERMS = ("हलचल", "हिल", "हिलना", "हिलता", "हिलती", "हरकत", "मूवमेंट", "किक", "फड़क", "movement",
-               "movements", "moment", "halchal", "hil", "hilna", "hilta", "hilti", "harkat", "kick", "kicks")
+               "movements", "moment", "moving", "kicking", "halchal", "hil", "hilna", "hilta", "hilti", "harkat",
+               "kick", "kicks")
 FETAL_REDUCED = ("कम", "नहीं", "नही", "बंद", "धीमा", "kam", "nahi", "nahin", "band", "less", "reduced",
                  "decreased", "no", "not", "slow")
 FETAL_NOT_REDUCED = ("कम नहीं", "kam nahi", "not less", "not reduced")
@@ -137,9 +138,10 @@ WEEKDAYS = {
     6: ("रविवार", "ravivar", "sunday"),
 }
 
-YES_TERMS = ("हां", "हा", "हान", "जी", "सही", "ठीक", "सेव", "बिल्कुल", "haan", "han", "ha", "haa", "ji",
+# Devanagari "यस"/"ओके"/"नो" are what a hi-IN recogniser writes for spoken English yes/ok/no.
+YES_TERMS = ("हां", "हा", "हान", "जी", "सही", "ठीक", "सेव", "बिल्कुल", "यस", "ओके", "haan", "han", "ha", "haa", "ji",
              "sahi", "theek", "thik", "yes", "yeah", "ok", "okay", "save", "correct", "bilkul")
-NO_TERMS = ("नहीं", "नही", "ना", "गलत", "मत", "रद्द", "nahi", "nahin", "nhi", "na", "no", "galat", "mat",
+NO_TERMS = ("नहीं", "नही", "ना", "नो", "गलत", "मत", "रद्द", "nahi", "nahin", "nhi", "na", "no", "galat", "mat",
             "cancel", "wrong")
 
 

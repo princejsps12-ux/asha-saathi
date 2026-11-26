@@ -4,7 +4,8 @@ WORKDIR /web
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
-RUN npm run build
+# Frontend unit tests (i18n) run on every build: a failing test fails the image.
+RUN npm test && npm run build
 
 # ---- 2. Python runtime: FastAPI serves the API and the built frontend ---------
 FROM python:3.12-slim

@@ -1,0 +1,214 @@
+// UI language: Hindi-first for ASHA workers, English for everyone else (e.g. judges).
+// Pure functions only (no React) so they are unit-tested in i18n.test.js.
+
+export const LANGS = ['hi', 'en']
+export const STORAGE_KEY = 'asha.lang'
+
+/** Stored choice wins; otherwise Hindi only if the browser's language is Hindi. */
+export function detectLang(stored, browserLanguage) {
+  if (LANGS.includes(stored)) return stored
+  return String(browserLanguage || '').toLowerCase().startsWith('hi') ? 'hi' : 'en'
+}
+
+export function loadLang(storage = globalThis.localStorage, nav = globalThis.navigator) {
+  let stored = null
+  try { stored = storage?.getItem(STORAGE_KEY) } catch { /* private mode / blocked storage */ }
+  return detectLang(stored, nav?.language)
+}
+
+export function saveLang(lang, storage = globalThis.localStorage) {
+  try { storage?.setItem(STORAGE_KEY, lang) } catch { /* ignore: preference just won't persist */ }
+}
+
+export const otherLang = (lang) => (lang === 'hi' ? 'en' : 'hi')
+
+export const STRINGS = {
+  hi: {
+    appName: 'आशा साथी',
+    tagline: 'मितानिन की आवाज़ वाली डायरी',
+    offlineBadge: '🔌 API की नहीं – ऑफ़लाइन मोड',
+    offlineTitle: 'ब्राउज़र आवाज़ पहचान + नियम-आधारित पार्सर। किसी API की की ज़रूरत नहीं।',
+    sttSarvam: '🎙 Sarvam आवाज़',
+    sttBrowser: '🎙 ब्राउज़र आवाज़',
+    extractGemini: '✨ Gemini + नियम',
+    extractRules: 'नियम',
+    langToggle: 'भाषा बदलें / Switch language',
+    tabVisit: 'विज़िट', tabWomen: 'लाभार्थी', tabDue: 'कल', tabRisk: 'हाई रिस्क',
+    resetDemo: '↺ डेमो डेटा रीसेट करें',
+    resetConfirm: 'डेमो डेटा रीसेट करें? सेव की गई विज़िट हट जाएँगी।',
+    footerRules: 'नियम: MoHFW / NHM ANC दिशानिर्देश · केवल निर्णय-सहायता',
+    presetVisit: '{name} की विज़िट',
+    clear: '✕ हटाएँ',
+    allWomen: 'सभी लाभार्थी',
+    noWomen: 'कोई लाभार्थी नहीं',
+    loading: 'लोड हो रहा है…',
+
+    phase_idle: 'माइक दबाकर विज़िट बोलें',
+    phase_listening: 'सुन रही हूँ… बोलती रहिए',
+    phase_thinking: 'समझ रही हूँ…',
+    phase_speaking: 'सुनिए, क्या यह सही है?',
+    phase_confirming: '"हाँ" या "नहीं" बोलिए',
+    phase_review: 'जाँचें, ज़रूरत हो तो टैप करके बदलें',
+    phase_saving: 'सेव हो रहा है…',
+    phase_saved: 'सेव हो गया ✓',
+    micStart: 'बोलना शुरू करें',
+    micStop: 'सुनना बंद करें',
+    noStt: 'इस ब्राउज़र में आवाज़ पहचान नहीं है — Chrome खोलें या “नमूना चलाएँ” दबाएँ।',
+    trySample: '▶ नमूना चलाएँ',
+    transcriptTitle: 'आपने कहा',
+    glossTitle: 'English gloss · अंग्रेज़ी सार',
+    savedBanner: '✓ विज़िट सेव हुई',
+    newVisit: '＋ नई विज़िट',
+    save: '✓ हाँ, सेव करें',
+    readAgain: '🔊 दोबारा सुनें',
+    reRecord: '🎤 दोबारा बोलें',
+    selectFirst: 'पहले लाभार्थी चुनें',
+    sayEdit: 'ठीक है। गलत जानकारी पर टैप करके बदलें, या दोबारा बोलें।',
+    sayUnknown: 'समझ नहीं आया। नीचे बटन दबाएँ।',
+    saySaved: 'सेव हो गया। धन्यवाद।',
+    saySavedDanger: 'सेव हो गया। ध्यान दें, खतरे का संकेत है: {titles}। {action}।',
+    'err_not-allowed': 'माइक की अनुमति नहीं मिली',
+    'err_no-speech': 'कुछ सुनाई नहीं दिया',
+    'err_audio-capture': 'माइक नहीं मिला',
+    err_network: 'आवाज़ पहचान के लिए इंटरनेट चाहिए',
+    err_other: 'आवाज़ पहचान में दिक्कत: {code}',
+    sttFallback: '{msg} — ब्राउज़र आवाज़ पहचान इस्तेमाल करें',
+
+    fieldsTitle: 'रजिस्टर एंट्री', tapToEdit: 'टैप करके बदलें',
+    f_beneficiary: 'लाभार्थी', f_month: 'गर्भ का महीना', f_bp: 'बीपी', f_hb: 'हीमोग्लोबिन',
+    f_weight: 'वज़न', f_temp: 'तापमान', f_symptoms: 'लक्षण', f_fetal: 'बच्चे की हलचल',
+    f_ifa: 'आयरन गोली (IFA)', f_td: 'टीडी टीका', f_next: 'अगली विज़िट',
+    select: 'चुनें', none: 'कोई नहीं', tapToAdd: '— टैप करें', ok: 'ठीक',
+    monthN: '{n} महीना', bpUpper: 'ऊपर', bpLower: 'नीचे',
+    fetal_normal: 'ठीक', fetal_reduced: 'कम', unknown: 'पता नहीं',
+    yes: 'हाँ', no: 'नहीं', ifaGiven: '{n} गोली दी',
+    td_1: 'पहला', td_2: 'दूसरा', td_3: 'बूस्टर', vaccineGiven: 'टीका लगा',
+    next_1: 'कल', next_2: 'परसों', next_7: 'अगले हफ्ते', next_14: '2 हफ्ते', next_28: '4 हफ्ते',
+
+    dangerTitle: 'खतरे का संकेत', dangerSub: 'अभी रेफ़र करें',
+    watchTitle: 'ध्यान दें', watchSub: 'फ़ॉलो-अप ज़रूरी',
+    why: 'क्यों', source: 'स्रोत',
+
+    risk_red: 'खतरा', risk_amber: 'ध्यान दें', risk_normal: 'सामान्य',
+    monthUnknown: 'महीना —',
+    dueTomorrow: 'कल की विज़िट', dueToday: 'आज की विज़िट', overdue: 'छूटी हुई विज़िट',
+    nothingTomorrow: 'कल कोई विज़िट नहीं', nothingToday: 'आज कोई विज़िट नहीं',
+    highRiskTitle: 'हाई रिस्क गर्भावस्था', highRiskSub: 'आखिरी विज़िट के आधार पर', noHighRisk: 'कोई हाई रिस्क नहीं',
+    back: '← वापस', husband: 'पति', years: '{n} वर्ष', nextVisit: 'अगली विज़िट',
+    recordFor: '🎤 इनकी विज़िट दर्ज करें', history: 'विज़िट इतिहास',
+
+    date_today: 'आज', date_tomorrow: 'कल', date_dayAfter: 'परसों', date_yesterday: 'कल था',
+    date_ago: '{n} दिन पहले',
+  },
+  en: {
+    appName: 'ASHA Saathi',
+    tagline: 'Voice diary for ASHA / Mitanin workers',
+    offlineBadge: '🔌 key not set – offline mode',
+    offlineTitle: 'Browser speech recognition + rule-based parser. No API key needed.',
+    sttSarvam: '🎙 Sarvam STT',
+    sttBrowser: '🎙 browser STT',
+    extractGemini: '✨ Gemini + rules',
+    extractRules: 'rules',
+    langToggle: 'Switch language / भाषा बदलें',
+    tabVisit: 'Visit', tabWomen: 'Women', tabDue: 'Due', tabRisk: 'High risk',
+    resetDemo: '↺ Reset demo data',
+    resetConfirm: 'Reset demo data? Saved visits will be removed.',
+    footerRules: 'Rules: MoHFW / NHM ANC guidelines · decision support only',
+    presetVisit: 'Visit for {name}',
+    clear: '✕ Clear',
+    allWomen: 'All beneficiaries',
+    noWomen: 'No beneficiaries',
+    loading: 'Loading…',
+
+    phase_idle: 'Tap the mic and describe the visit',
+    phase_listening: 'Listening… pause to finish',
+    phase_thinking: 'Extracting fields…',
+    phase_speaking: 'Reading back — is this correct?',
+    phase_confirming: 'Say “yes” to save or “no” to edit',
+    phase_review: 'Check, and tap a field to fix it',
+    phase_saving: 'Saving…',
+    phase_saved: 'Saved ✓',
+    micStart: 'Start speaking',
+    micStop: 'Stop listening',
+    noStt: 'This browser has no speech recognition — use Chrome, or press “Try sample”.',
+    trySample: '▶ Try sample',
+    transcriptTitle: 'Transcript',
+    glossTitle: 'English gloss',
+    savedBanner: '✓ Visit saved',
+    newVisit: '＋ New visit',
+    save: '✓ Yes, save',
+    readAgain: '🔊 Read again',
+    reRecord: '🎤 Record again',
+    selectFirst: 'Select the woman first',
+    sayEdit: 'Okay. Tap a wrong field to fix it, or record again.',
+    sayUnknown: 'Sorry, I did not catch that. Please use the buttons below.',
+    saySaved: 'Saved. Thank you.',
+    saySavedDanger: 'Saved. Warning, danger sign: {titles}. {action}.',
+    'err_not-allowed': 'Microphone permission denied',
+    'err_no-speech': 'No speech heard',
+    'err_audio-capture': 'No microphone found',
+    err_network: 'Speech recognition needs internet',
+    err_other: 'Speech recognition error: {code}',
+    sttFallback: '{msg} — use browser speech recognition',
+
+    fieldsTitle: 'Register entry', tapToEdit: 'tap to edit',
+    f_beneficiary: 'Woman', f_month: 'Pregnancy month', f_bp: 'BP (mmHg)', f_hb: 'Hb (g/dL)',
+    f_weight: 'Weight (kg)', f_temp: 'Temperature (°F)', f_symptoms: 'Symptoms', f_fetal: 'Baby movement',
+    f_ifa: 'Taking IFA tablets', f_td: 'Td vaccine', f_next: 'Next visit',
+    select: 'Select', none: 'None', tapToAdd: '— tap to add', ok: 'OK',
+    monthN: 'month {n}', bpUpper: 'Upper', bpLower: 'Lower',
+    fetal_normal: 'Normal', fetal_reduced: 'Reduced', unknown: 'Unknown',
+    yes: 'Yes', no: 'No', ifaGiven: '{n} tablets given',
+    td_1: '1st dose', td_2: '2nd dose', td_3: 'Booster', vaccineGiven: 'Vaccine given',
+    next_1: 'Tomorrow', next_2: 'Day after', next_7: 'Next week', next_14: '2 weeks', next_28: '4 weeks',
+
+    dangerTitle: 'Danger sign', dangerSub: 'Refer now',
+    watchTitle: 'Watch', watchSub: 'Needs follow-up',
+    why: 'Why', source: 'Source',
+
+    risk_red: 'High risk', risk_amber: 'Watch', risk_normal: 'Normal',
+    monthUnknown: 'month —',
+    dueTomorrow: 'Due tomorrow', dueToday: 'Due today', overdue: 'Overdue',
+    nothingTomorrow: 'Nothing due tomorrow', nothingToday: 'Nothing due today',
+    highRiskTitle: 'High-risk pregnancies', highRiskSub: 'based on the latest visit', noHighRisk: 'No high-risk cases',
+    back: '← Back', husband: 'Husband', years: '{n} yrs', nextVisit: 'Next visit',
+    recordFor: '🎤 Record a visit', history: 'Visit history',
+
+    date_today: 'Today', date_tomorrow: 'Tomorrow', date_dayAfter: 'Day after tomorrow', date_yesterday: 'Yesterday',
+    date_ago: '{n} days ago',
+  },
+}
+
+/** Look up a string; falls back to Hindi, then to the key itself. Replaces {placeholders}. */
+export function translate(lang, key, vars) {
+  const text = STRINGS[lang]?.[key] ?? STRINGS.hi[key] ?? key
+  return vars ? text.replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? '')) : text
+}
+
+const MONTHS = {
+  hi: ['जन', 'फ़र', 'मार्च', 'अप्रै', 'मई', 'जून', 'जुला', 'अग', 'सित', 'अक्टू', 'नव', 'दिस'],
+  en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+}
+
+export function parseISODate(iso) {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+export function addDays(isoToday, days) {
+  const d = parseISODate(isoToday)
+  d.setDate(d.getDate() + days)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** "Tomorrow · 28 Nov" / "कल · 28 नव", relative to the server's "today". */
+export function formatDate(iso, today, lang = 'hi') {
+  if (!iso) return '—'
+  const d = parseISODate(iso)
+  const label = `${d.getDate()} ${MONTHS[lang][d.getMonth()]}`
+  if (!today) return label
+  const diff = Math.round((d - parseISODate(today)) / 86400000)
+  const rel = { [-1]: 'date_yesterday', 0: 'date_today', 1: 'date_tomorrow', 2: 'date_dayAfter' }[diff]
+  if (rel) return `${translate(lang, rel)} · ${label}`
+  return diff < 0 ? `${label} (${translate(lang, 'date_ago', { n: -diff })})` : label
+}

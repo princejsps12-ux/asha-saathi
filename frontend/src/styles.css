@@ -43,6 +43,33 @@ h1, h2, h3 { margin: 0; }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand h1 { font-size: 1.3rem; line-height: 1.1; }
 .brand small { opacity: .85; font-size: .72rem; }
+.topbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.lang-toggle { display: inline-flex; background: rgba(255, 255, 255, .16); border-radius: 999px; padding: 3px; }
+.lang-toggle button {
+  border: 0; background: transparent; color: #fff; font-weight: 700; font-size: .85rem;
+  min-width: 44px; min-height: 36px; border-radius: 999px; padding: 0 10px;
+}
+.lang-toggle button.on { background: #fff; color: var(--green-dark); }
+
+/* Two-line bilingual label: current language on top, the other language underneath. */
+.bi { display: inline-flex; flex-direction: column; line-height: 1.2; }
+.bi-sub { font-size: .74em; font-weight: 400; color: var(--muted); }
+.bi.inline { display: inline; }
+.bi.inline .bi-sub { margin-left: 6px; }
+.bi.inline .bi-sub::before { content: '· '; }
+.phase { align-items: center; margin: 12px 0 8px; }
+.phase .bi-main { font-size: 1.15rem; font-weight: 600; }
+.phase .bi-sub { font-size: .85rem; }
+.chip-on .bi-sub { color: rgba(255, 255, 255, .8); }
+.alerts-red .alerts-head strong .bi-sub { color: var(--muted); }
+.field-row dd .bi { align-items: flex-end; }
+.btn-primary .bi-sub { color: rgba(255, 255, 255, .8); }
+.saved-banner .bi-sub { color: inherit; opacity: .8; }
+
+.gloss { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.gloss h4 { margin: 0 0 4px; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.gloss p { margin: 0; font-size: .95rem; color: #2f3a36; }
+
 .badge { font-size: .72rem; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
 .badge-offline { background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .35); }
 .badge-online { background: var(--saffron); color: #3b2500; font-weight: 600; }
@@ -71,8 +98,7 @@ h1, h2, h3 { margin: 0; }
   100% { box-shadow: 0 0 0 26px rgba(239, 68, 68, 0); }
 }
 @keyframes breathe { to { transform: scale(.94); } }
-.phase-hi { margin: 12px 0 0; font-size: 1.15rem; font-weight: 600; }
-.phase-en { margin: 0 0 8px; color: var(--muted); font-size: .85rem; }
+.person-name .bi-main { font-weight: 700; font-size: 1.08rem; }
 .warn { background: var(--amber-soft); color: var(--amber); padding: 10px 12px; border-radius: 12px; font-size: .9rem; }
 
 /* ---------- cards */

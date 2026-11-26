@@ -1,25 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { api } from '../api.js'
-import { RISK } from '../labels.js'
-import { browserSttSupported, listen, recordAudio, recorderSupported, speak, speechErrorText, stopSpeaking } from '../speech.js'
+import { RISK_ICON } from '../labels.js'
+import { Bi, useI18n } from '../lang.jsx'
+import { browserSttSupported, listen, recordAudio, recorderSupported, speak, speechLang, stopSpeaking } from '../speech.js'
 import AlertList from './AlertList.jsx'
 import FieldsCard from './FieldsCard.jsx'
 
 // The core flow: speak -> extract -> read back -> confirm by voice -> save -> alert.
 // phase: idle | listening | thinking | speaking | confirming | review | saving | saved
-
-const PHASE_TEXT = {
-  idle: ['माइक दबाकर विज़िट बोलें', 'Tap the mic and describe the visit'],
-  listening: ['सुन रही हूँ… बोलती रहिए', 'Listening… pause to finish'],
-  thinking: ['समझ रही हूँ…', 'Extracting fields…'],
-  speaking: ['सुनिए, क्या यह सही है?', 'Reading back the entry'],
-  confirming: ['"हाँ" या "नहीं" बोलिए', 'Say “haan” to save or “nahi” to edit'],
-  review: ['जाँचें, ज़रूरत हो तो टैप करके बदलें', 'Check and tap a field to fix it'],
-  saving: ['सेव हो रहा है…', 'Saving…'],
-  saved: ['सेव हो गया ✓', 'Saved'],
-}
+// The UI language picks the recognition language (hi-IN / en-IN) and the read-back text.
 
 export default function RecordView({ status, people, symptomLabels, samples, preset, onSaved }) {
+  const { lang, t, pick } = useI18n()
   const [phase, setPhase] = useState('idle')
   const [transcript, setTranscriptState] = useState('')
   const [analysis, setAnalysis] = useState(null)
@@ -33,6 +25,9 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   const flow = useRef(0)
   const useServerStt = status?.stt === 'sarvam' && recorderSupported
   const canListen = browserSttSupported || useServerStt
+  const voice = speechLang(lang)
+  const say = (text) => speak(text, voice)
+  const speechError = (code) => (t(`err_${code}`) === `err_${code}` ? t('err_other', { code }) : t(`err_${code}`))
 
   const setTranscript = (text) => { transcriptRef.current = text; setTranscriptState(text) }
   const newFlow = () => {
@@ -54,7 +49,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   async function process(text) {
     const id = flow.current
     if (!text.trim()) {
-      setError(speechErrorText('no-speech')); setPhase('idle'); return
+      setError(speechError('no-speech')); setPhase('idle'); return
     }
     setPhase('thinking'); setError('')
     try {
@@ -73,11 +68,12 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   async function readBackAndConfirm(result) {
     const id = newFlow()
     setPhase('speaking')
-    await speak(result.summary_hi)
+    await say(pick(result.summary_hi, result.summary_en))
     if (id !== flow.current) return
     if (!browserSttSupported) { setPhase('review'); return }
     setPhase('confirming')
     handle.current = listen({
+      lang: voice,
       silenceMs: 1500,
       startTimeoutMs: 6000,
       onError: () => id === flow.current && setPhase('review'),
@@ -89,8 +85,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
         if (intent === 'yes') save(result)
         else {
           setPhase('review')
-          speak(intent === 'no' ? 'ठीक है। गलत जानकारी पर टैप करके बदलें, या दोबारा बोलें।'
-            : 'समझ नहीं आया। नीचे बटन दबाएँ।')
+          say(t(intent === 'no' ? 'sayEdit' : 'sayUnknown'))
         }
       },
     })
@@ -99,8 +94,8 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   async function save(result = analysis) {
     newFlow()
     if (result?.fields.beneficiary_id == null) {
-      setError('पहले लाभार्थी चुनें / Select the woman first'); setPhase('review')
-      speak('पहले लाभार्थी चुनें।')
+      setError(t('selectFirst')); setPhase('review')
+      say(t('selectFirst'))
       return
     }
     setPhase('saving')
@@ -109,8 +104,12 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
       setAnalysis(saved); setPhase('saved')
       onSaved?.()
       const red = saved.alerts.filter((a) => a.severity === 'red')
-      speak(red.length ? `सेव हो गया। ध्यान दें, खतरे का संकेत है: ${red.map((a) => a.title_hi).join(', ')}। ${red[0].action_hi}।`
-        : 'सेव हो गया। धन्यवाद।')
+      say(red.length
+        ? t('saySavedDanger', {
+          titles: red.map((a) => pick(a.title_hi, a.title_en)).join(', '),
+          action: pick(red[0].action_hi, red[0].action_en),
+        })
+        : t('saySaved'))
     } catch (e) {
       setError(e.message); setPhase('review')
     }
@@ -122,8 +121,9 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     const id = flow.current
     setPhase('listening')
     handle.current = listen({
+      lang: voice,
       onText: (text) => id === flow.current && setTranscript(text),
-      onError: (code) => id === flow.current && setError(speechErrorText(code)),
+      onError: (code) => id === flow.current && setError(speechError(code)),
       onEnd: (text) => {
         if (id !== flow.current) return
         setTranscript(text); process(text)
@@ -145,12 +145,12 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
             const { transcript: text } = await api.stt(blob)
             setTranscript(text); process(text)
           } catch (e) {
-            setError(`${e.message} — ब्राउज़र आवाज़ पहचान इस्तेमाल करें`); setPhase('idle')
+            setError(t('sttFallback', { msg: e.message })); setPhase('idle')
           }
         },
       }
     } catch {
-      setError(speechErrorText('not-allowed')); setPhase('idle')
+      setError(speechError('not-allowed')); setPhase('idle')
     }
   }
 
@@ -186,7 +186,6 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     }
   }
 
-  const [hi, en] = PHASE_TEXT[phase]
   const busy = ['thinking', 'saving', 'speaking'].includes(phase)
   const nextSample = samples[sampleIndex % (samples.length || 1)]
 
@@ -195,28 +194,30 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
       <div className="mic-zone">
         <button type="button" className={`mic mic-${phase}`} onClick={micPressed}
           disabled={!canListen || busy || phase === 'confirming'}
-          aria-label={phase === 'listening' ? 'Stop listening' : 'Start speaking'}>
+          aria-label={t(phase === 'listening' ? 'micStop' : 'micStart')}>
           <svg viewBox="0 0 24 24" aria-hidden>
             {phase === 'listening'
               ? <rect x="7" y="7" width="10" height="10" rx="2" />
               : <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z" />}
           </svg>
         </button>
-        <p className="phase-hi">{hi}</p>
-        <p className="phase-en">{en}</p>
-        {!canListen && (
-          <p className="warn">इस ब्राउज़र में आवाज़ पहचान नहीं है — Chrome खोलें या “Try sample” दबाएँ।
-            <br /><small>This browser has no speech recognition. Use Chrome, or press Try sample.</small></p>
-        )}
+        <Bi k={`phase_${phase}`} className="phase" />
+        {!canListen && <p className="warn"><Bi k="noStt" /></p>}
         <button type="button" className="btn btn-ghost" onClick={trySample} disabled={busy || phase === 'listening'}>
-          ▶ Try sample · नमूना चलाएँ {nextSample && <small>({nextSample.label})</small>}
+          {t('trySample')} {nextSample && <small>({pick(nextSample.label_hi, nextSample.label_en)})</small>}
         </button>
       </div>
 
       {(transcript || phase === 'listening') && (
         <section className="card transcript">
-          <h3>आपने कहा <span className="en">Transcript</span></h3>
+          <h3>{t('transcriptTitle')}</h3>
           <p>{transcript || <span className="muted">…</span>}{phase === 'listening' && <span className="caret" />}</p>
+          {analysis?.gloss_en && (
+            <div className="gloss" lang="en">
+              <h4>{t('glossTitle')}</h4>
+              <p>{analysis.gloss_en}</p>
+            </div>
+          )}
         </section>
       )}
 
@@ -226,7 +227,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
         <>
           {phase === 'saved' && (
             <div className={`saved-banner risk-${analysis.risk}`}>
-              ✓ विज़िट सेव हुई · Visit saved — {RISK[analysis.risk].icon} {RISK[analysis.risk].hi} / {RISK[analysis.risk].en}
+              {t('savedBanner')} — {RISK_ICON[analysis.risk]} <Bi k={`risk_${analysis.risk}`} className="inline" />
             </div>
           )}
           <AlertList alerts={analysis.alerts} />
@@ -235,15 +236,15 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
             onChange={onFieldsChange} disabled={phase === 'saving' || phase === 'saved'} />
           <div className="actions">
             {phase === 'saved' ? (
-              <button type="button" className="btn btn-primary btn-big" onClick={reset}>＋ नई विज़िट · New visit</button>
+              <button type="button" className="btn btn-primary btn-big" onClick={reset}>{t('newVisit')}</button>
             ) : (
               <>
                 <button type="button" className="btn btn-primary btn-big" onClick={() => save()}
-                  disabled={phase === 'saving' || phase === 'thinking'}>✓ हाँ, सेव करें · Save</button>
+                  disabled={phase === 'saving' || phase === 'thinking'}>{t('save')}</button>
                 <button type="button" className="btn btn-secondary" onClick={() => readBackAndConfirm(analysis)}
-                  disabled={busy}>🔊 दोबारा सुनें · Read again</button>
+                  disabled={busy}>{t('readAgain')}</button>
                 <button type="button" className="btn btn-secondary" onClick={startMic} disabled={busy || !canListen}>
-                  🎤 दोबारा बोलें · Re-record</button>
+                  {t('reRecord')}</button>
               </>
             )}
           </div>

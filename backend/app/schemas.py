@@ -26,6 +26,7 @@ class VisitFields(BaseModel):
 
     beneficiary_id: Optional[int] = None
     beneficiary_name: Optional[str] = None
+    beneficiary_name_en: Optional[str] = None
     pregnancy_month: Optional[int] = Field(None, ge=1, le=10)
     bp_systolic: Optional[int] = Field(None, ge=50, le=260)
     bp_diastolic: Optional[int] = Field(None, ge=30, le=180)
@@ -46,8 +47,10 @@ class Alert(BaseModel):
     severity: Literal["red", "amber"]
     title_hi: str
     title_en: str
-    reason: str  # human-readable WHY, includes the measured values
+    reason: str  # human-readable WHY in English, includes the measured values
+    reason_hi: str = ""  # same WHY in Hindi
     action_hi: str
+    action_en: str = ""
     source: str  # guideline citation
 
 
@@ -63,7 +66,9 @@ class Analysis(BaseModel):
     fields: VisitFields
     alerts: list[Alert]
     risk: Literal["red", "amber", "normal"]
-    summary_hi: str
+    summary_hi: str  # Hindi read-back, ends with the yes/no question
+    summary_en: str  # English read-back, ends with the yes/no question
+    gloss_en: str  # English gloss of the extracted visit (no question) for the transcript card
     engine: Literal["rules", "gemini+rules"] = "rules"
     engine_note: Optional[str] = None
 

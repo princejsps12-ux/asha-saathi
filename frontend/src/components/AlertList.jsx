@@ -1,27 +1,33 @@
-// Danger-sign alerts: every alert shows WHY it fired and which guideline it comes from.
+import { Bi, useI18n } from '../lang.jsx'
+
+// Danger-sign alerts: every alert shows WHY it fired and which guideline it comes from,
+// with the current language on top and the other language underneath.
 export default function AlertList({ alerts, compact = false }) {
+  const { t } = useI18n()
   if (!alerts?.length) return null
-  const red = alerts.filter((a) => a.severity === 'red')
+  const red = alerts.some((a) => a.severity === 'red')
   return (
-    <section className={`alerts ${red.length ? 'alerts-red' : 'alerts-amber'}`} role="alert">
+    <section className={`alerts ${red ? 'alerts-red' : 'alerts-amber'}`} role="alert">
       {!compact && (
         <header className="alerts-head">
-          <span className="alerts-icon" aria-hidden>{red.length ? '🚨' : '⚡'}</span>
+          <span className="alerts-icon" aria-hidden>{red ? '🚨' : '⚡'}</span>
           <div>
-            <strong>{red.length ? 'खतरे का संकेत' : 'ध्यान दें'}</strong>
-            <small>{red.length ? 'Danger sign — refer now' : 'Needs follow-up'}</small>
+            <strong><Bi k={red ? 'dangerTitle' : 'watchTitle'} /></strong>
+            <small>{t(red ? 'dangerSub' : 'watchSub')}</small>
           </div>
         </header>
       )}
       <ul>
         {alerts.map((a) => (
           <li key={a.code} className={`alert alert-${a.severity}`}>
-            <div className="alert-title">
-              {a.title_hi} <span className="en">· {a.title_en}</span>
+            <div className="alert-title"><Bi hi={a.title_hi} en={a.title_en} /></div>
+            <div className="alert-why">
+              <b>{t('why')}:</b> <Bi hi={a.reason_hi || a.reason} en={a.reason} />
             </div>
-            <div className="alert-why"><b>क्यों / Why:</b> {a.reason}</div>
-            {!compact && <div className="alert-action">👉 {a.action_hi}</div>}
-            {!compact && <div className="alert-source">Source: {a.source}</div>}
+            {!compact && (
+              <div className="alert-action">👉 <Bi hi={a.action_hi} en={a.action_en || a.action_hi} /></div>
+            )}
+            {!compact && <div className="alert-source">{t('source')}: {a.source}</div>}
           </li>
         ))}
       </ul>
