@@ -9,15 +9,15 @@ Resume rule: if work is interrupted, read this file first and continue from the 
 - [x] Public GitHub repo `asha-saathi` created, `.gitignore`, `.env.example`
 
 ## Backend
-- [ ] FastAPI + SQLite app structure
-- [ ] Rule-based Hindi/Hinglish/English parser (numbers, months, BP, symptoms, IFA, TT/Td, next visit date)
-- [ ] Danger-sign rules file with guideline citations, alert explains WHY
-- [ ] Optional Sarvam STT + Gemini extraction, graceful "offline mode" when keys missing
-- [ ] Seed data: 5 beneficiaries with Hindi names, villages, due dates
-- [ ] API: extract, evaluate, save visit, beneficiaries, history, due tomorrow, high risk, status
+- [x] FastAPI + SQLite app structure
+- [x] Rule-based Hindi/Hinglish/English parser (numbers, months, BP, symptoms, IFA, TT/Td, next visit date)
+- [x] Danger-sign rules file with guideline citations, alert explains WHY
+- [x] Optional Sarvam STT + Gemini extraction, graceful "offline mode" when keys missing
+- [x] Seed data: 5 beneficiaries with Hindi names, villages, due dates
+- [x] API: extract, evaluate, save visit, beneficiaries, history, due tomorrow, high risk, status
 
 ## Tests
-- [ ] pytest: parser rules (Hinglish, Hindi number words), danger rules, API tests — 25+ cases
+- [x] pytest: parser rules (Hinglish, Hindi number words), danger rules, API tests — 25+ cases
 - [ ] All tests pass inside Docker
 
 ## Frontend
