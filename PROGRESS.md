@@ -18,19 +18,19 @@ Resume rule: if work is interrupted, read this file first and continue from the 
 
 ## Tests
 - [x] pytest: parser rules (Hinglish, Hindi number words), danger rules, API tests — 25+ cases
-- [ ] All tests pass inside Docker
+- [x] All tests pass inside Docker
 
 ## Frontend
-- [ ] Big mic button, live transcript (Web Speech API hi-IN)
-- [ ] Extracted fields card, editable by tap
-- [ ] Hindi read-back (hi-IN TTS) + voice confirm (haan/nahi) + buttons
-- [ ] Red alert with reasons
-- [ ] Beneficiary list, visit history, due tomorrow, high-risk lists
-- [ ] "Try sample" button
-- [ ] Offline-mode badge, Hindi-first labels, mobile-first
+- [x] Big mic button, live transcript (Web Speech API hi-IN)
+- [x] Extracted fields card, editable by tap
+- [x] Hindi read-back (hi-IN TTS) + voice confirm (haan/nahi) + buttons
+- [x] Red alert with reasons
+- [x] Beneficiary list, visit history, due tomorrow, high-risk lists
+- [x] "Try sample" button
+- [x] Offline-mode badge, Hindi-first labels, mobile-first
 
 ## Delivery
-- [ ] Dockerfile + docker-compose.yml, one command, prints URL
+- [x] Dockerfile + docker-compose.yml, one command, prints URL
 - [ ] README (problem, demo steps, mermaid diagram, offline vs key mode, fallbacks, rules table, run)
 - [ ] Strict self-review + fixes
 - [ ] Fresh clone → docker compose up → app works → tests pass

@@ -1,0 +1,23 @@
+# One command, no keys needed:   docker compose up
+# Run the test suite:            docker compose run --rm app pytest
+services:
+  app:
+    build: .
+    image: asha-saathi:latest
+    ports:
+      - "${PORT:-8000}:8000"
+    environment:
+      # All optional. Empty = offline mode (browser speech + rule-based parser).
+      # Put real values in a local .env file (never committed) to enable upgrades.
+      SARVAM_API_KEY: ${SARVAM_API_KEY:-}
+      SARVAM_STT_MODEL: ${SARVAM_STT_MODEL:-saarika:v2.5}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      APP_TZ: ${APP_TZ:-Asia/Kolkata}
+      PUBLIC_PORT: ${PORT:-8000}
+    volumes:
+      - asha-data:/data
+    restart: unless-stopped
+
+volumes:
+  asha-data:
