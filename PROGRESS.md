@@ -149,3 +149,7 @@ Reported on a phone: transcript "Sunita Sahu सात महीने BP 150 �
 - [x] Bug: EN toggle, STT "…बीपी 150/100…" marked "BP not clear". Root cause: phone STT inserts invisible direction/joiner marks (LRM/RLM/ZWSP) and look-alike slashes (⁄ ∕ ／) inside "150/100"; the pair didn't match and the single-number fallback reported "heard 150"
 - [x] Fix: all text is NFKC-normalised, invisible marks removed and slash look-alikes unified before parsing; a plausible pair right after "BP"/"बीपी" (any short separator, or none) always wins over every other guard; implausible values still ask again and dates are still not BP
 - [x] Tests: exact text in all 3 modes (backend parametrised + frontend हिं + EN / हिं / EN: text unchanged, correct STT language, BP 150/100 shown), 12 invisible-mark/separator variants, guards unchanged → 280 pytest + 89 vitest in Docker
+
+## Try sample: all samples listed (2026-11-27)
+- [x] The rotating single "Try sample" button is replaced by a compact 2×2 list of bilingual chips under "▶ नमूना चलाएँ / Try sample": खतरे के संकेत · Danger signs, खून की कमी · Anaemia, खून आना · Bleeding, बीपी साफ़ नहीं · Unclear BP (real STT); any one can be picked directly
+- [x] Tests: component test (all 4 chips with Hindi + English labels; tapping "Unclear BP · real STT" runs exactly that text); 90 vitest + 280 pytest in Docker; checked at 375 px

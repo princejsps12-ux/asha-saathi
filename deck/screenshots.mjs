@@ -48,7 +48,7 @@ async function main() {
   await shot('01-home')
 
   // Try sample (Hindi, danger signs) -> extraction, read-back, waiting for "हाँ"
-  await page.click('.btn-ghost')
+  await page.click('.sample-chip') // first sample: Hindi, danger signs
   await page.waitForSelector('.confirm-bar', { timeout: 60000 })
   await wait(1500)
   await page.evaluate(() => window.scrollTo(0, 0))

@@ -308,3 +308,15 @@ h1, h2, h3 { margin: 0; }
 .badge-sync .bi-sub { color: #3b2500; }
 .saved-offline { background: var(--amber-soft); color: var(--amber); }
 .mode-note { max-width: 420px; text-align: center; margin-top: 4px; }
+
+/* "नमूना चलाएँ / Try sample": every sample visible as a small bilingual chip (compact on phones) */
+.samples { width: 100%; margin-top: 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.samples-title { font-size: .95rem; font-weight: 700; color: var(--green-dark); }
+.sample-chips { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; max-width: 420px; }
+.sample-chip {
+  min-height: 46px; padding: 6px 10px; border-radius: 12px; border: 1.5px dashed var(--green);
+  background: #fff; color: var(--green-dark); text-align: left; line-height: 1.15;
+}
+.sample-chip .bi-main { font-size: .88rem; font-weight: 600; }
+.sample-chip .bi-sub { font-size: .7rem; }
+.sample-chip:active:not(:disabled) { background: var(--green-soft); }

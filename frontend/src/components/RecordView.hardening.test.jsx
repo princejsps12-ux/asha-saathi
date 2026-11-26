@@ -60,7 +60,7 @@ const props = {
   status: { stt: 'browser', today: '2026-11-27' },
   people: [{ id: 1, name_hi: 'सुनीता साहू', name_en: 'Sunita Sahu', village: 'कुरुद', village_en: 'Kurud' }],
   symptomLabels: {},
-  samples: [{ id: 's', label_hi: 'नमूना', label_en: 'Sample', text: NOTE }],
+  samples: [{ id: 's', label_hi: 'नमूना ·', label_en: 'Sample', text: NOTE }],
   preset: null,
 }
 const offline = async () => { const { ApiError } = await import('../api.js'); return new ApiError('err_unreachable') }
@@ -84,7 +84,8 @@ describe('2. browser without speech recognition (Firefox, some iOS)', () => {
     render(<RecordView {...props} />)
     expect(screen.getByText('इस ब्राउज़र में आवाज़ नहीं चलती - Chrome खोलें')).toBeTruthy()
     expect(screen.getByText('Voice not supported here - use Chrome')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Try sample/ })).toBeTruthy()
+    expect(screen.getByText('▶ नमूना चलाएँ')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /नमूना · Sample/ })).toBeTruthy() // samples still available
     fireEvent.change(screen.getByRole('textbox', { name: /लिखकर दर्ज करें/ }), { target: { value: NOTE } })
     fireEvent.click(screen.getByRole('button', { name: /जानकारी निकालें/ }))
     await waitFor(() => expect(api.extract).toHaveBeenCalledWith(NOTE))
@@ -171,5 +172,28 @@ describe('4. a woman who is not on the list', () => {
     expect(api.evaluate).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: /सुनीता साहू · कुरुद/ }))
     await waitFor(() => expect(api.evaluate).toHaveBeenCalledWith(expect.objectContaining({ beneficiary_id: 1 })))
+  })
+})
+
+describe('Try sample: every sample is listed and can be picked directly', () => {
+  const SAMPLES = [
+    { id: 'hindi_red', label_hi: 'खतरे के संकेत · हिंदी', label_en: 'Danger signs · Hindi', text: 'रेखा वर्मा बीपी 142 बटा 92' },
+    { id: 'hinglish_amber', label_hi: 'खून की कमी · हिंग्लिश', label_en: 'Anaemia · Hinglish', text: 'Sunita Sahu Hb saadhe nau' },
+    { id: 'english_bleeding', label_hi: 'खून आना · अंग्रेज़ी', label_en: 'Bleeding · English', text: 'Kamla Dhruw bleeding' },
+    { id: 'real_stt_unclear', label_hi: 'बीपी साफ़ नहीं · असली STT', label_en: 'Unclear BP · real STT',
+      text: 'सुनीता साहू 7 महीने बीपी 15 बाय 100' },
+  ]
+
+  it('shows all samples at once as bilingual buttons and runs the one tapped', async () => {
+    render(<RecordView {...props} samples={SAMPLES} />)
+    expect(screen.getByText('▶ नमूना चलाएँ')).toBeTruthy()
+    const chips = document.querySelectorAll('.sample-chip')
+    expect(chips).toHaveLength(4)
+    for (const s of SAMPLES) {
+      const chip = screen.getByRole('button', { name: new RegExp(s.label_en) })
+      expect(chip.textContent).toContain(s.label_hi) // Hindi line on top, English underneath
+    }
+    fireEvent.click(screen.getByRole('button', { name: /Unclear BP · real STT/ })) // pick it directly
+    await waitFor(() => expect(api.extract).toHaveBeenCalledWith(SAMPLES[3].text))
   })
 })

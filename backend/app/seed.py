@@ -36,23 +36,23 @@ BENEFICIARIES = [
 SAMPLES = [
     {
         "id": "hindi_red",
-        "label_hi": "हिंदी — खतरे के संकेत",
-        "label_en": "Hindi — danger signs",
+        "label_hi": "खतरे के संकेत · हिंदी",
+        "label_en": "Danger signs · Hindi",
         "text": "रेखा वर्मा के घर गई। पांच महीने की गर्भवती है। बीपी एक सौ बयालीस बटा बानवे है, "
                 "पैरों में सूजन और सिर दर्द की शिकायत है। बच्चे की हलचल ठीक है। आयरन की गोली रोज़ ले रही है, "
                 "टीडी का दूसरा टीका लगा। अगली विज़िट कल।",
     },
     {
         "id": "hinglish_amber",
-        "label_hi": "हिंग्लिश — खून की कमी",
-        "label_en": "Hinglish — anaemia",
+        "label_hi": "खून की कमी · हिंग्लिश",
+        "label_en": "Anaemia · Hinglish",
         "text": "Sunita Sahu, saat mahine ki pregnant hai, BP 120 by 80, koi sujan nahi, baby movement theek hai, "
                 "Hb saadhe nau, iron ki goli le rahi hai, agle hafte phir aaungi",
     },
     {
         "id": "english_bleeding",
-        "label_hi": "अंग्रेज़ी — खून आना",
-        "label_en": "English — bleeding",
+        "label_hi": "खून आना · अंग्रेज़ी",
+        "label_en": "Bleeding · English",
         "text": "Kamla Dhruw, 4 months pregnant, BP 150 upar 100 neeche, some bleeding since morning, "
                 "not taking iron tablets, next visit in 2 days",
     },
@@ -60,8 +60,8 @@ SAMPLES = [
         # Exact Chrome hi-IN output for a spoken Hinglish note: no punctuation, "150" heard as
         # "15", "कम" heard as "काम". Shows that a mis-heard BP is asked again, never guessed.
         "id": "real_stt_unclear",
-        "label_hi": "असली STT — बीपी साफ़ नहीं",
-        "label_en": "Real speech-to-text — unclear BP",
+        "label_hi": "बीपी साफ़ नहीं · असली STT",
+        "label_en": "Unclear BP · real STT",
         "text": "सुनीता साहू 7 महीने बीपी 15 बाय 100 पैरों में सूजन है बेबी मूवमेंट काम है अगले हफ्ते फिर आऊंगी",
     },
 ]

@@ -33,7 +33,7 @@ The cost of a late entry is clinical, not clerical. **High BP, bleeding, severe 
    - **A pending visit is never lost.** If listening stops, the hint reads *"माइक दबाकर हाँ या नहीं बोलें / Tap mic and say yes or no"*. Tapping the mic then listens **only for the answer** and keeps every extracted field.
    - The visit is also kept in the browser (localStorage), so a **page refresh restores it**. Only a save, or **＋ New visit** (which asks first), clears it.
 8. Open **📅 कल (Due)**: Rekha now appears in *due tomorrow*. Open **⚠️ Risk**: she is on the high-risk list.
-9. Tap **Try sample** until *Real speech-to-text — unclear BP* comes up. This is the exact text Chrome produced from a real recording, with "150" heard as "15" and कम as काम. The BP field turns amber, nothing is guessed, and the read-back asks for the BP again.
+9. Under **▶ नमूना चलाएँ / Try sample**, every sample is listed as its own button: *Danger signs · Hindi*, *Anaemia · Hinglish*, *Bleeding · English*, *Unclear BP · real STT*. Tap **Unclear BP · real STT**. This is the exact text Chrome produced from a real recording, with "150" heard as "15" and कम as काम. The BP field turns amber, nothing is guessed, and the read-back asks for the BP again.
 10. With a mic: tap the big button and speak at your own pace. Pauses of up to about 3 seconds to think are fine: the app shows **"सुन रही हूँ… / Listening…"** and keeps listening. Finish by saying **"बस"** or **"हो गया"**, or tap the big **बस ✓ / Done** button. Say something like
    *"Sunita Sahu, saat mahine, BP 150 by 100, pairon mein sujan hai, baby movement kam hai, agle hafte phir aaungi"*.
 

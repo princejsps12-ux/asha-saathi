@@ -45,7 +45,6 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   const [typeOpen, setTypeOpen] = useState(!(browserSttSupported || (status?.stt === 'sarvam' && recorderSupported)))
   const [typed, setTyped] = useState('')
   const [hideNewWoman, setHideNewWoman] = useState(false)
-  const [sampleIndex, setSampleIndex] = useState(0)
   const handle = useRef(null)
   const presetRef = useRef(preset)
   const transcriptRef = useRef(restored?.transcript || draft)
@@ -350,12 +349,11 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     else startDictation()
   }
 
-  async function trySample() {
-    if (!samples.length || pending) return
+  /** Run one chosen sample visit through the real pipeline (for anyone without a mic). */
+  async function trySample(sample) {
+    if (!sample || pending) return
     newVisit()
     const id = flow.current
-    const sample = samples[sampleIndex % samples.length]
-    setSampleIndex((i) => i + 1)
     setPhase('listening')
     // Type the sentence out so it looks and feels like live dictation.
     const words = sample.text.split(' ')
@@ -379,7 +377,6 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
 
   const busy = ['thinking', 'saving'].includes(phase)
   const canRetryExtraction = Boolean(error) && !analysis && Boolean(transcript.trim()) && phase === 'idle'
-  const nextSample = samples[sampleIndex % (samples.length || 1)]
   const phaseKey = phase === 'confirming'
     ? (retrying ? 'phase_listenAgain' : analysis?.unclear?.length ? 'phase_clarify' : 'phase_confirming')
     : busy && slow ? 'phase_waking' : `phase_${phase}`
@@ -412,11 +409,18 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
             <small><Bi k="noSttHelp" always /></small>
           </div>
         )}
-        {!pending && (
-          <button type="button" className="btn btn-ghost" onClick={trySample} disabled={busy || phase === 'listening'}>
-            <Bi k="trySample" />
-            {nextSample && <small>(<Bi hi={nextSample.label_hi} en={nextSample.label_en} inline />)</small>}
-          </button>
+        {!pending && samples.length > 0 && (
+          <section className="samples" aria-label="नमूना चलाएँ / Try sample">
+            <h3 className="samples-title"><Bi k="trySample" inline /></h3>
+            <div className="sample-chips">
+              {samples.map((sample) => (
+                <button key={sample.id} type="button" className="sample-chip" onClick={() => trySample(sample)}
+                  disabled={busy || phase === 'listening'}>
+                  <Bi hi={sample.label_hi} en={sample.label_en} />
+                </button>
+              ))}
+            </div>
+          </section>
         )}
       </div>
 
