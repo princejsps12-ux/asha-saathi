@@ -86,8 +86,19 @@ describe('translations', () => {
     expect(translate('hi', 'monthN', { n: 7 })).toBe('7 महीना')
     expect(translate('en', 'no_such_key')).toBe('no_such_key')
   })
-  it('keeps the offline badge text the judges expect', () => {
-    expect(translate('en', 'offlineBadge')).toContain('key not set – offline mode')
+  it('is honest about what needs internet: no "offline mode" claims anywhere', () => {
+    expect(translate('en', 'offlineBadge')).toBe('No API keys needed')
+    expect(translate('en', 'modeNote')).toBe("No API keys needed; speech uses the browser's built-in recognition "
+      + '(needs internet); extraction and danger rules run fully on our server.')
+    for (const lang of ['hi', 'en']) {
+      for (const [key, text] of Object.entries(STRINGS[lang])) {
+        expect(/offline mode|ऑफ़लाइन मोड/i.test(text), `${lang}.${key}`).toBe(false)
+      }
+    }
+  })
+  it('unsupported-browser message is exactly the agreed bilingual text', () => {
+    expect(translate('hi', 'noStt')).toBe('इस ब्राउज़र में आवाज़ नहीं चलती - Chrome खोलें')
+    expect(translate('en', 'noStt')).toBe('Voice not supported here - use Chrome')
   })
 })
 

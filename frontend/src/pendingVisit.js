@@ -32,3 +32,19 @@ export function loadPending(storage = globalThis.localStorage, now = Date.now())
 export function clearPending(storage = globalThis.localStorage) {
   try { storage?.removeItem(PENDING_KEY) } catch { /* nothing to clear */ }
 }
+
+// A transcript that could not be extracted (no network): kept so a refresh doesn't lose it,
+// and re-sent for extraction when the connection returns.
+export const DRAFT_KEY = 'asha.draftTranscript.v1'
+
+export function saveDraft(transcript, storage = globalThis.localStorage) {
+  try { storage?.setItem(DRAFT_KEY, String(transcript || '')) } catch { /* blocked storage */ }
+}
+
+export function loadDraft(storage = globalThis.localStorage) {
+  try { return storage?.getItem(DRAFT_KEY) || '' } catch { return '' }
+}
+
+export function clearDraft(storage = globalThis.localStorage) {
+  try { storage?.removeItem(DRAFT_KEY) } catch { /* nothing to clear */ }
+}

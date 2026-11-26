@@ -291,3 +291,20 @@ h1, h2, h3 { margin: 0; }
 .btn-done { min-height: 64px; min-width: 200px; font-size: 1.3rem; background: var(--red); color: #fff; border-radius: 16px; margin-top: 6px; }
 .btn-done .bi { align-items: center; }
 .btn-done .bi-sub { color: rgba(255, 255, 255, .85); }
+
+/* Hardening: unsupported browser, type-in fallback, new woman, offline sync */
+.warn { display: flex; flex-direction: column; gap: 4px; text-align: center; }
+.warn strong .bi { align-items: center; }
+.type-in { display: flex; flex-direction: column; align-items: center; }
+.type-in form { width: 100%; display: flex; flex-direction: column; gap: 10px; }
+.type-in textarea, .new-woman input {
+  font: inherit; width: 100%; border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #fff;
+}
+.new-woman { display: flex; flex-direction: column; gap: 12px; border: 2px solid var(--saffron); }
+.new-woman label { display: flex; flex-direction: column; gap: 4px; font-size: .9rem; }
+.new-woman .actions { grid-template-columns: 1fr 1fr; }
+.did-you-mean h3, .add-new h3 { margin-bottom: 8px; }
+.badge-sync { background: var(--saffron); color: #3b2500; font-weight: 600; }
+.badge-sync .bi-sub { color: #3b2500; }
+.saved-offline { background: var(--amber-soft); color: var(--amber); }
+.mode-note { max-width: 420px; text-align: center; margin-top: 4px; }

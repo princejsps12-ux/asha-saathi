@@ -15,11 +15,23 @@ from .db import Database
 from .integrations import IntegrationError, gemini_extract, merge_fields, sarvam_transcribe
 from .parser import classify_confirmation, merge_correction, parse_visit, unclear_fields
 from .rules import evaluate, risk_level
-from .schemas import SYMPTOM_LABELS, Analysis, EvaluateRequest, ExtractRequest, IntentRequest, VisitCreate, VisitFields
+from .schemas import (
+    SYMPTOM_LABELS,
+    Analysis,
+    BeneficiaryCreate,
+    EvaluateRequest,
+    ExtractRequest,
+    IntentRequest,
+    VisitCreate,
+    VisitFields,
+)
 from .seed import SAMPLES, refresh_stale_demo, seed
 from .summary import build_gloss_en, build_summary, build_summary_en
 
 log = logging.getLogger("asha")
+# Honest description of the no-key mode, shown in the UI and logs.
+MODE_NOTE = ("No API keys needed; speech uses the browser's built-in recognition (needs internet); "
+             "extraction and danger rules run fully on our server.")
 MAX_AUDIO_BYTES = 10 * 1024 * 1024  # ~10 MB is several minutes of compressed speech
 
 # Every error the UI can see is bilingual ("Hindi / English") and says what to do next.
@@ -54,15 +66,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if person is None:
                 raise HTTPException(404, MSG_NOT_FOUND)
             fields.beneficiary_name, fields.beneficiary_name_en = person["name_hi"], person["name_en"]
+            fields.beneficiary_name_heard, fields.beneficiary_suggestions = None, []
         else:  # never show a stale name for an unselected woman
             fields.beneficiary_name = fields.beneficiary_name_en = None
+        suggested = [_brief(p) for p in map(db.get_beneficiary, fields.beneficiary_suggestions) if p]
         alerts = evaluate(fields)
         today = settings.today()
         return Analysis(fields=fields, alerts=alerts, risk=risk_level(alerts),
-                        summary_hi=build_summary(fields, alerts, today),
-                        summary_en=build_summary_en(fields, alerts, today),
-                        gloss_en=build_gloss_en(fields, alerts, today), engine=engine, engine_note=note,
-                        unclear=unclear_fields(fields), changed=changed)
+                        summary_hi=build_summary(fields, alerts, today, suggested),
+                        summary_en=build_summary_en(fields, alerts, today, suggested),
+                        gloss_en=build_gloss_en(fields, alerts, today, suggested), engine=engine, engine_note=note,
+                        unclear=unclear_fields(fields), changed=changed, suggestions=suggested)
 
     @app.exception_handler(Exception)
     async def unhandled(_: Request, exc: Exception) -> JSONResponse:  # never leak a stack trace to the UI
@@ -86,7 +100,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "extraction": "gemini+rules" if settings.gemini_enabled else "rules",
             "sarvam_key_set": settings.sarvam_enabled,
             "gemini_key_set": settings.gemini_enabled,
-            "offline_mode": not (settings.sarvam_enabled or settings.gemini_enabled),
+            "offline_mode": not (settings.sarvam_enabled or settings.gemini_enabled),  # = no API keys in use
+            "mode_note": MODE_NOTE,
             "today": settings.today().isoformat(),
         }
 
@@ -109,7 +124,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 fields = merge_fields(fields, gemini_extract(req.transcript, people, settings.today(), settings))
                 engine = "gemini+rules"
             except IntegrationError as exc:
-                note = f"{exc} — used offline parser"
+                note = f"{exc} — used the built-in parser"
         if req.base is None:
             return analyse(fields, engine=engine, note=note)
         merged, changed = merge_correction(req.base, fields)  # spoken correction, e.g. "BP 150 by 100"
@@ -147,6 +162,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                                    result.fields, result.alerts, result.risk)
         return {"visit": store.get_visit(visit_id), "analysis": result.model_dump(mode="json")}
 
+    @app.post("/api/beneficiaries", status_code=201)
+    def add_beneficiary(req: BeneficiaryCreate, store: Database = Depends(get_db)) -> dict:
+        """Add a woman who isn't on the list yet (asked, never guessed, from the visit screen)."""
+        name = " ".join(req.name.split())
+        for person in store.list_beneficiaries():
+            if name.lower() in (person["name_hi"].lower(), person["name_en"].lower()):
+                return {**person, "created": False}  # already there: never create a duplicate
+        village = " ".join(req.village.split()) or "—"
+        new_id = store.add_beneficiary(name_hi=name, name_en=name, village=village, village_en=village)
+        return {**store.get_beneficiary(new_id), "created": True}
+
     @app.get("/api/beneficiaries")
     def beneficiaries(store: Database = Depends(get_db)) -> list[dict]:
         return store.list_beneficiaries()
@@ -180,6 +206,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     _mount_frontend(app, settings.static_dir)
     return app
+
+
+def _brief(person: dict) -> dict:
+    return {k: person[k] for k in ("id", "name_hi", "name_en", "village", "village_en")}
 
 
 def _mount_frontend(app: FastAPI, static_dir: Path) -> None:

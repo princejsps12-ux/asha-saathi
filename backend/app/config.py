@@ -1,6 +1,6 @@
 """Runtime configuration, read once from environment variables.
 
-Every key is optional. With no keys the app runs in "offline mode":
+Every key is optional. With no keys the app runs in "no-key mode":
 browser speech recognition + the built-in rule-based parser.
 """
 from __future__ import annotations
@@ -28,7 +28,7 @@ class Settings:
     sarvam_model: str = field(default_factory=lambda: _env("SARVAM_STT_MODEL", "saarika:v2.5"))
     gemini_api_key: str = field(default_factory=lambda: _env("GEMINI_API_KEY"))
     gemini_model: str = field(default_factory=lambda: _env("GEMINI_MODEL", "gemini-2.5-flash"))
-    # Network timeout for optional paid APIs; on timeout we fall back to offline mode.
+    # Network timeout for optional paid APIs; on timeout we fall back to the built-in parser.
     api_timeout_s: float = 12.0
 
     @property

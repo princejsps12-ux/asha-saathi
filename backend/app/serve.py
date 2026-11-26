@@ -15,7 +15,8 @@ def main() -> None:
     settings = get_settings()
     app = create_app(settings)
     public_port = os.getenv("PUBLIC_PORT", str(settings.port))
-    mode = "OFFLINE mode (no API keys needed)" if not (settings.sarvam_enabled or settings.gemini_enabled) \
+    mode = "No-key mode: browser speech recognition (needs internet) + extraction/rules on this server" \
+        if not (settings.sarvam_enabled or settings.gemini_enabled) \
         else f"key mode: sarvam={settings.sarvam_enabled}, gemini={settings.gemini_enabled}"
     banner = "=" * 60
     print(f"\n{banner}\n  ASHA Saathi is running → open  http://localhost:{public_port}\n  {mode}\n{banner}\n",

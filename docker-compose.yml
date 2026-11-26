@@ -6,7 +6,7 @@ services:
     ports:
       - "${PORT:-8000}:8000"
     environment:
-      # All optional. Empty = offline mode (browser speech + rule-based parser).
+      # All optional. Empty = no-key mode: browser speech (needs internet) + our rule-based parser.
       # Put real values in a local .env file (never committed) to enable upgrades.
       SARVAM_API_KEY: ${SARVAM_API_KEY:-}
       SARVAM_STT_MODEL: ${SARVAM_STT_MODEL:-saarika:v2.5}

@@ -1,5 +1,5 @@
 """Read-back text (spoken by browser TTS) and an English gloss, both built only from
-the extracted fields, so they work fully offline and always match what will be saved."""
+the extracted fields (no API key, no extra service) and always match what will be saved."""
 from __future__ import annotations
 
 from datetime import date
@@ -42,8 +42,24 @@ def english_date(d: date, today: date) -> str:
     return f"{relative}, {absolute}" if relative else absolute
 
 
-def _hindi_parts(f: VisitFields, alerts: list[Alert], today: date) -> list[str]:
-    parts = [f.beneficiary_name or "लाभार्थी का नाम नहीं मिला, कृपया सूची से चुनें"]
+def _unknown_woman_hi(f: VisitFields, suggested: list[dict]) -> str:
+    if suggested:
+        return f"क्या आपका मतलब {suggested[0]['name_hi']} है? सूची से चुनें"
+    if f.beneficiary_name_heard:
+        return f"{f.beneficiary_name_heard} — यह नाम सूची में नहीं है। नई लाभार्थी जोड़ें या सूची से चुनें"
+    return "लाभार्थी का नाम नहीं मिला, कृपया सूची से चुनें"
+
+
+def _unknown_woman_en(f: VisitFields, suggested: list[dict]) -> str:
+    if suggested:
+        return f"Did you mean {suggested[0]['name_en']}? Pick from the list"
+    if f.beneficiary_name_heard:
+        return f"{f.beneficiary_name_heard} is not on the list. Add as a new woman, or pick from the list"
+    return "Beneficiary not recognised, please pick from the list"
+
+
+def _hindi_parts(f: VisitFields, alerts: list[Alert], today: date, suggested: list[dict]) -> list[str]:
+    parts = [f.beneficiary_name or _unknown_woman_hi(f, suggested)]
     if f.pregnancy_month:
         parts.append(f"{f.pregnancy_month} महीने की गर्भवती")
     if f.bp_systolic and f.bp_diastolic:
@@ -79,8 +95,8 @@ def _hindi_parts(f: VisitFields, alerts: list[Alert], today: date) -> list[str]:
     return parts
 
 
-def _english_parts(f: VisitFields, alerts: list[Alert], today: date) -> list[str]:
-    parts = [f.beneficiary_name_en or f.beneficiary_name or "Beneficiary not recognised, please pick from the list"]
+def _english_parts(f: VisitFields, alerts: list[Alert], today: date, suggested: list[dict]) -> list[str]:
+    parts = [f.beneficiary_name_en or f.beneficiary_name or _unknown_woman_en(f, suggested)]
     if f.pregnancy_month:
         parts.append(f"{f.pregnancy_month} months pregnant")
     if f.bp_systolic and f.bp_diastolic:
@@ -119,18 +135,18 @@ def _english_parts(f: VisitFields, alerts: list[Alert], today: date) -> list[str
     return parts
 
 
-def build_summary(f: VisitFields, alerts: list[Alert], today: date) -> str:
+def build_summary(f: VisitFields, alerts: list[Alert], today: date, suggested: list[dict] | None = None) -> str:
     """Hindi read-back, ending with the yes/no question."""
     question = CLARIFY_HI if _needs_clarifying(f) else QUESTION_HI
-    return "। ".join(_hindi_parts(f, alerts, today)) + "। " + question
+    return "। ".join(_hindi_parts(f, alerts, today, suggested or [])) + "। " + question
 
 
-def build_gloss_en(f: VisitFields, alerts: list[Alert], today: date) -> str:
+def build_gloss_en(f: VisitFields, alerts: list[Alert], today: date, suggested: list[dict] | None = None) -> str:
     """English gloss of the extracted visit, shown under the (Hindi) transcript."""
-    return ". ".join(_english_parts(f, alerts, today)) + "."
+    return ". ".join(_english_parts(f, alerts, today, suggested or [])) + "."
 
 
-def build_summary_en(f: VisitFields, alerts: list[Alert], today: date) -> str:
+def build_summary_en(f: VisitFields, alerts: list[Alert], today: date, suggested: list[dict] | None = None) -> str:
     """English read-back, ending with the yes/no question."""
     question = CLARIFY_EN if _needs_clarifying(f) else QUESTION_EN
-    return build_gloss_en(f, alerts, today) + " " + question
+    return build_gloss_en(f, alerts, today, suggested) + " " + question

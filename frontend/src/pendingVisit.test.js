@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { PENDING_KEY, PENDING_MAX_AGE_MS, clearPending, loadPending, savePending } from './pendingVisit.js'
+import {
+  PENDING_KEY, PENDING_MAX_AGE_MS, clearDraft, clearPending, loadDraft, loadPending, saveDraft, savePending,
+} from './pendingVisit.js'
 
 const memoryStorage = () => {
   const data = {}
@@ -41,5 +43,16 @@ describe('pending visit storage (survives a page refresh)', () => {
     expect(() => savePending({ transcript: 'x', analysis }, blocked)).not.toThrow()
     expect(loadPending(blocked)).toBeNull()
     expect(() => clearPending(blocked)).not.toThrow()
+  })
+})
+
+describe('draft transcript (words that could not be extracted offline)', () => {
+  it('is kept across a refresh and cleared after use', () => {
+    const storage = memoryStorage()
+    saveDraft('सुनीता साहू सात महीने', storage)
+    expect(loadDraft(storage)).toBe('सुनीता साहू सात महीने')
+    clearDraft(storage)
+    expect(loadDraft(storage)).toBe('')
+    expect(loadDraft(blocked)).toBe('')
   })
 })

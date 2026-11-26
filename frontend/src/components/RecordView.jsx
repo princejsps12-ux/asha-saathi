@@ -5,7 +5,8 @@ import { translate } from '../i18n.js'
 import { RISK_ICON } from '../labels.js'
 import { Bi, useI18n } from '../lang.jsx'
 import { createEndDetector, stripEndCommand } from '../dictation.js'
-import { clearPending, loadPending, savePending } from '../pendingVisit.js'
+import { clearDraft, clearPending, loadDraft, loadPending, saveDraft, savePending } from '../pendingVisit.js'
+import { enqueueVisit } from '../syncQueue.js'
 import { forSpeech } from '../spokenText.js'
 import {
   DICTATION_MAX_RESTARTS, DICTATION_SILENCE_MS, DICTATION_START_TIMEOUT_MS, browserSttSupported, listen, recordAudio,
@@ -14,6 +15,7 @@ import {
 import AlertList from './AlertList.jsx'
 import { ErrorNote } from './Feedback.jsx'
 import FieldsCard from './FieldsCard.jsx'
+import NewWomanCard from './NewWomanCard.jsx'
 
 // The core flow: dictate -> extract -> read back -> confirm by voice -> save -> alert.
 // phase: idle | listening | thinking | speaking | confirming | review | saving | saved
@@ -26,22 +28,27 @@ const PENDING_PHASES = new Set(['speaking', 'confirming', 'review', 'saving'])
 const MAX_ECHO_RELISTENS = 1
 const SLOW_SERVER_MS = 6000 // after this, say the server is waking up (free tier cold start)
 
-export default function RecordView({ status, people, symptomLabels, samples, preset, onSaved }) {
+export default function RecordView({ status, people, symptomLabels, samples, preset, onSaved, onQueued, onPeopleChanged }) {
   const { lang, t, plain, pick } = useI18n()
   const [restored] = useState(loadPending) // read once, on first render
+  const [draft] = useState(() => (restored ? '' : loadDraft())) // un-extracted words from an offline moment
   const [phase, setPhase] = useState(restored ? 'review' : 'idle')
-  const [transcript, setTranscriptState] = useState(restored?.transcript || '')
+  const [transcript, setTranscriptState] = useState(restored?.transcript || draft)
   const [analysis, setAnalysis] = useState(restored?.analysis || null)
-  const [error, setError] = useState(null) // { k, vars } i18n key, rendered by <ErrorNote>
+  const [error, setError] = useState(draft ? { k: 'offlineDraft' } : null) // { k, vars } i18n key
   const [notice, setNotice] = useState(restored ? 'pendingRestored' : null)
   const [retrying, setRetrying] = useState(false)
   const [heardAnswer, setHeardAnswer] = useState('')
   const [slow, setSlow] = useState(false)
   const [dictating, setDictating] = useState(false)
+  const [savedOffline, setSavedOffline] = useState(false)
+  const [typeOpen, setTypeOpen] = useState(!(browserSttSupported || (status?.stt === 'sarvam' && recorderSupported)))
+  const [typed, setTyped] = useState('')
+  const [hideNewWoman, setHideNewWoman] = useState(false)
   const [sampleIndex, setSampleIndex] = useState(0)
   const handle = useRef(null)
   const presetRef = useRef(preset)
-  const transcriptRef = useRef(restored?.transcript || '')
+  const transcriptRef = useRef(restored?.transcript || draft)
   // Every new action bumps this token; async callbacks from an older flow (TTS ending,
   // a late "haan") check it and quietly do nothing, so flows never overlap.
   const flow = useRef(0)
@@ -86,6 +93,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   const newVisit = () => {
     newFlow()
     setPhase('idle'); setTranscript(''); setAnalysis(null); setError(null); setNotice(null); setHeardAnswer('')
+    setSavedOffline(false); setHideNewWoman(false); clearDraft()
   }
 
   /** The only way to throw away an unsaved visit: an explicit tap, confirmed. */
@@ -93,6 +101,40 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     if (pending && !window.confirm(plain('discardConfirm'))) return
     newVisit()
   }
+
+  /** Type-in fallback (no speech recognition, mic blocked, or simply preferred). */
+  function submitTyped() {
+    const text = typed.trim()
+    if (!text) return
+    newVisit()
+    setTranscript(text)
+    setTyped('')
+    process(text)
+  }
+
+  /** "Did you mean…?" chip, or "pick from list" (null): never a guess. */
+  function pickWoman(id) {
+    if (id == null) {
+      setHideNewWoman(true)
+      document.querySelector('.fields')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
+    onFieldsChange({ ...analysis.fields, beneficiary_id: id })
+  }
+
+  function womanAdded(person) {
+    onPeopleChanged?.()
+    onFieldsChange({ ...analysis.fields, beneficiary_id: person.id })
+  }
+
+  // Back online: re-send words that couldn't be extracted while offline.
+  useEffect(() => {
+    const retryDraft = () => {
+      if (loadDraft() && !analysis && phase === 'idle') retryExtraction()
+    }
+    window.addEventListener('online', retryDraft)
+    return () => window.removeEventListener('online', retryDraft)
+  })
 
   async function process(text) {
     const id = flow.current
@@ -106,10 +148,14 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
         result = await api.evaluate({ ...result.fields, beneficiary_id: presetRef.current })
       }
       if (id !== flow.current) return
+      clearDraft()
       setAnalysis(result)
       await readBackAndConfirm(result)
     } catch (e) {
-      if (id === flow.current) { setError(toUiError(e)); setPhase('idle') }
+      if (id !== flow.current) return
+      const offline = e?.key === 'err_unreachable'
+      if (offline) saveDraft(text) // keep her words on the phone; retried when the network returns
+      setError(offline ? { k: 'offlineDraft' } : toUiError(e)); setPhase('idle')
     }
   }
 
@@ -206,6 +252,12 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
         })
         : t('saySaved'))
     } catch (e) {
+      if (e?.key === 'err_unreachable') { // no network: keep the confirmed visit on the phone
+        onQueued?.(enqueueVisit({ transcript: transcriptRef.current, fields: result.fields }))
+        setSavedOffline(true); setPhase('saved')
+        say(t('saySavedOffline'))
+        return
+      }
       setError(toUiError(e)); setPhase('review') // still pending: nothing is lost
     }
   }
@@ -216,6 +268,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     const id = flow.current
     const endDetector = createEndDetector()
     let endCommand = null // "बस" / "हो गया" said as a command: removed before extraction
+    let engineError = null // e.g. mic blocked: its guidance must not be replaced by "no speech heard"
     setPhase('listening')
     setDictating(true)
     const dictation = listen({
@@ -234,13 +287,19 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
           dictation.stop() // she said "बस" / "हो गया": finish now
         }
       },
-      onError: (code) => id === flow.current && setError(speechError(code)),
+      onError: (code) => {
+        if (id !== flow.current) return
+        engineError = code
+        setError(speechError(code))
+        if (code === 'not-allowed' || code === 'audio-capture') setTypeOpen(true) // offer typing
+      },
       onEnd: (text) => {
         if (id !== flow.current) return
         setDictating(false)
         // Never lose words that were already on screen (some mobile engines end with no final result).
         const heard = stripEndCommand(text || transcriptRef.current, endCommand)
         setTranscript(heard)
+        if (!heard.trim() && engineError) { setPhase('idle'); return } // keep the mic / network guidance
         if (heard.trim()) setError(null) // an engine error after speech doesn't matter: we have text
         process(heard)
       },
@@ -347,7 +406,12 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
         ) : <Bi k={phaseKey} className="phase" />}
         {phase === 'review' && pending && <small className="phase-sub"><Bi k="reviewSub" /></small>}
         {phase === 'confirming' && heardAnswer && <p className="heard">“{heardAnswer}”</p>}
-        {!canListen && <p className="warn"><Bi k="noStt" /></p>}
+        {!canListen && (
+          <div className="warn" role="alert">
+            <strong><Bi k="noStt" always /></strong>
+            <small><Bi k="noSttHelp" always /></small>
+          </div>
+        )}
         {!pending && (
           <button type="button" className="btn btn-ghost" onClick={trySample} disabled={busy || phase === 'listening'}>
             <Bi k="trySample" />
@@ -398,9 +462,34 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
         <button type="button" className="btn btn-primary" onClick={retryExtraction}><Bi k="retryExtract" /></button>
       )}
 
+      {!pending && phase !== 'listening' && (
+        <section className="type-in">
+          {!typeOpen && canListen ? (
+            <button type="button" className="link" onClick={() => setTypeOpen(true)}><Bi k="typeToggle" /></button>
+          ) : (
+            <form className="card" onSubmit={(e) => { e.preventDefault(); submitTyped() }}>
+              <h3><Bi k="typeToggle" inline /></h3>
+              <textarea rows={3} value={typed} onChange={(e) => setTyped(e.target.value)}
+                placeholder={plain('typePlaceholder')} aria-label={plain('typeToggle')} />
+              <button type="submit" className="btn btn-primary" disabled={!typed.trim() || busy}>
+                <Bi k="typeSubmit" />
+              </button>
+            </form>
+          )}
+        </section>
+      )}
+
+      {analysis && phase !== 'saved' && analysis.fields.beneficiary_id == null && !hideNewWoman && (
+        <NewWomanCard key={analysis.fields.beneficiary_name_heard || 'none'} fields={analysis.fields}
+          suggestions={analysis.suggestions} onPick={pickWoman} onAdded={womanAdded} />
+      )}
+
       {analysis && (
         <>
-          {phase === 'saved' && (
+          {phase === 'saved' && savedOffline && (
+            <div className="saved-banner saved-offline" role="status"><Bi k="savedOffline" always /></div>
+          )}
+          {phase === 'saved' && !savedOffline && (
             <div className={`saved-banner risk-${analysis.risk}`}>
               <Bi k="savedBanner" inline /> — {RISK_ICON[analysis.risk]} <Bi k={`risk_${analysis.risk}`} inline />
             </div>

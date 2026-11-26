@@ -1,6 +1,6 @@
 """Rule-based extractor: spoken Hindi / Hinglish / English visit note -> VisitFields.
 
-Works fully offline with no API key. Design notes:
+Needs no API key: plain Python running on our server. Design notes:
 * Speech engines mix scripts ("बीपी 140 by 90, sujan hai"), so every vocabulary
   list carries Devanagari and romanised forms.
 * Devanagari vowel signs are not regex "word" characters, so Devanagari terms
@@ -9,6 +9,7 @@ Works fully offline with no API key. Design notes:
 """
 from __future__ import annotations
 
+import difflib
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -56,13 +57,16 @@ def _pattern(*parts: str) -> re.Pattern[str]:
     return re.compile(fold("|".join(parts)))
 
 
-NEGATIONS = ("नहीं", "नही", "मत", "nahi", "nahin", "nhi", "nai", "no", "not", "never", "without")
+# Includes dialect negations: Chhattisgarhi "नइ", Bhojpuri "नइखे" / "ना".
+NEGATIONS = ("नहीं", "नही", "मत", "नइ", "नइखे", "नइहे", "nahi", "nahin", "nhi", "nai", "naikhe", "no", "not", "never",
+             "without")
 # Browser speech-to-text usually returns NO punctuation, so we also end a clause after a
 # sentence-final verb ("सूजन है | बेबी मूवमेंट कम है"); otherwise one "नहीं" would negate
 # every symptom in the whole visit note.
 _CLAUSE_SPLIT = re.compile(
     r"[,।;!?\n]+|\.(?!\d)|\s(?:और|लेकिन|मगर|aur|lekin|magar|but|and)\s"
     r"|(?<=\sहै)\s|(?<=\sहैं)\s|(?<=\sथा)\s|(?<=\sथी)\s|(?<=\shai)\s|(?<=\shain)\s"
+    r"|(?<=\sबा)\s|(?<=\sहे)\s|(?<=\sba)\s"  # Bhojpuri "बा", Chhattisgarhi "हे" = "है"
 )
 
 
@@ -70,45 +74,80 @@ def split_clauses(text: str) -> list[str]:
     return [c.strip() for c in _CLAUSE_SPLIT.split(text) if c and c.strip()]
 
 
+# Hesitation fillers carry no information and can split a phrase ("बीपी 150 उम्म बाय 100").
+FILLERS = frozenset({"अं", "अम्म", "उम", "उम्म", "हम्म", "मतलब", "यानी", "um", "umm", "uh", "uhh", "hmm", "hmmm",
+                     "matlab", "yani", "yaani"})
+MAX_REPEAT_WORDS = 4  # "बीपी बीपी 150 बाय 100 150 बाय 100" -> collapse repeats of up to 4 words
+
+
+def _drop_noise(words: list[str]) -> list[str]:
+    """Remove filler words and immediately repeated fragments (speech engines and people both
+    repeat themselves: "सुनीता सुनीता साहू", "सात सात महीने")."""
+    words = [w for w in words if w.strip(".,!?।") not in FILLERS]
+    for size in range(MAX_REPEAT_WORDS, 0, -1):
+        i = 0
+        while i + 2 * size <= len(words):
+            keys = [w.strip(".,!?।") for w in words[i:i + 2 * size]]
+            if keys[:size] == keys[size:]:
+                del words[i + size:i + 2 * size]
+            else:
+                i += 1
+    return words
+
+
 def _preprocess(text: str) -> str:
     text = normalize_numbers(text).lower()  # also folds nukta / chandrabindu
     # "8 point 5" / "8 पॉइंट 5" -> 8.5
     text = re.sub(r"(\d+)\s*(?:point|पॉइंट|पॉइन्ट|दशमलव)\s*(\d)", r"\1.\2", text)
-    return re.sub(r"\s+", " ", text).strip()
+    return " ".join(_drop_noise(text.split()))
 
 
 # --------------------------------------------------------------------------- vocab
 
 SYMPTOM_PATTERNS: dict[str, re.Pattern[str]] = {
     # "sujan"/"soojan" (noun) and "sooj gaya"/"suje" (verb: became swollen)
-    "swelling": _pattern(r"सूजन|सुजन|सूझन|सोजन|सूज",
-                         r"(?<![a-z])(?:s[ou]{1,2}j(?:aa?n|a|e|i)?|swelling|swollen|o?edema)(?![a-z])"),
+    # Dialect: "सूजल" (Bhojpuri), "गोड़ / पैर फूल गइल" (feet swollen; but "सांस फूलना" is breathlessness).
+    "swelling": _pattern(r"सूजन|सुजन|सूझन|सोजन|सूजल|सुजल|सूज",
+                         r"(?:पैर|पांव|गोड|हाथ|मुंह|चेहर|देह)\S*\s+(?:\S+\s+)?(?:फूल|फुल)",
+                         r"(?<![a-z])(?:s[ou]{1,2}j(?:aa?n|a|e|i|al)?|swelling|swollen|o?edema)(?![a-z])",
+                         r"(?<![a-z])(?:pair|paon|paanv|god|haath|hath|munh|chehr)\w*\s+(?:\w+\s+)?(?:phool|phul|ful)"),
+    # Dialect: "मूड़ पिरात" (Bhojpuri), "मुड़ी पीरा" (Chhattisgarhi), "माथा दुखत", "कपार दरद".
     "headache": _pattern(r"(?:सिर|सर)\s*(?:में\s*)?(?:बहुत\s*|तेज\s*)?दर्द",
+                         r"(?:मूड|मुडी|मुंडी|माथा|माथे|कपार)\s*(?:में\s*)?(?:\S+\s*)?(?:पिरा|पीरा|दुख|दर्द|दरद)",
                          r"(?<![a-z])(?:sir|sar)\s*(?:me|mein|main)?\s*(?:bahut\s*|tez\s*)?dard",
+                         r"(?<![a-z])(?:mood|mud|mudi|mundi|matha|mathe|kapar)\s*(?:me\s*)?(?:\w+\s*)?"
+                         r"(?:pira|peera|dukh|dard|darad)",
                          r"head\s*ache"),
     "blurred_vision": _pattern(r"धुंधला|धुंधलापन|आंखों के आगे अंधेरा|कम दिख",
                                r"dhundh?la|blurr?(?:ed|y)|ankhon ke aage andhera|kam dikh"),
-    "bleeding": _pattern(r"ब्लीडिंग|रक्तस्राव|स्पॉटिंग|खून\s*(?:का\s*)?(?:आ|बह|गिर|निकल|जा रह)",
-                         r"(?<![a-z])(?:bleeding|spotting|(?:khoon|khun)\s*(?:ka\s*)?(?:aa|beh|bah|gir|nikal|ja rah))"),
+    # Dialect: "लहू / रकत" (blood) with "आवत / गिरत / जात" (comes / falls / goes).
+    "bleeding": _pattern(r"ब्लीडिंग|रक्तस्राव|स्पॉटिंग",
+                         r"(?:खून|लहू|लहु|रकत)\s*(?:का\s*)?(?:आ|बह|गिर|निकल|जा रह|जात)",
+                         r"(?<![a-z])(?:bleeding|spotting|(?:khoon|khun|lahu|lahoo|rakat)\s*(?:ka\s*)?"
+                         r"(?:aa|beh|bah|gir|nikal|ja rah|jat))"),
     "convulsions": _pattern(r"दौरा पड|दौरे पड|दौरे आ|झटके|ऐंठन|मिर्गी",
                             r"(?<![a-z])(?:fits?|convulsions?|seizures?|daura pad|daure|jhatke)(?![a-z])"),
-    "breathlessness": _pattern(r"सांस\s*(?:फूल|की तकलीफ|लेने में)",
+    "breathlessness": _pattern(r"सांस\s*(?:फूल|फुल|की तकलीफ|लेने में)",
                                r"saa?ns\s*(?:phool|fool|ki taklee?f|lene me)|breathless|short(?:ness)? of breath"),
-    "pallor_weakness": _pattern(r"कमजोरी|थकान|चक्कर|पीलापन|खून की कमी|एनीमिया",
+    "pallor_weakness": _pattern(r"कमजोरी|थकान|थकावट|चक्कर|पीलापन|खून की कमी|एनीमिया",
                                 r"(?<![a-z])(?:kamz?j?ori|thakaa?n|chakk?ar|weakness|weak|tired|fatigue|pale|dizz\w*"
                                 r"|(?:khoon|khun) ki kami|ana?emia)(?![a-z])"),
     "abdominal_pain": _pattern(r"पेट\s*(?:में\s*)?(?:बहुत\s*|तेज\s*)?दर्द",
                                r"(?<![a-z])pet\s*(?:me|mein)?\s*(?:bahut\s*|tez\s*)?dard|abdominal pain|stomach pain"),
-    "fever": _pattern(r"बुखार|ताप", r"(?<![a-z])(?:bukh?aa?r|fever)(?![a-z])"),
+    # Dialect: "बोखार" (Bhojpuri), "जर" (Chhattisgarhi), "ज्वर" (formal Hindi).
+    "fever": _pattern(r"बुखार|बोखार|ताप|ज्वर", r"(?<![\u0900-\u097F])जर(?![\u0900-\u097F])",
+                      r"(?<![a-z])(?:bukh?aa?r|bokhar|jwar|jvar|fever)(?![a-z])"),
 }
 FACE_HAND_TERMS = ("चेहर", "मुंह", "हाथ", "हाथों", "आंख", "face", "hands", "hand", "haath", "chehra",
                    "chehre", "munh")
 
 FETAL_TERMS = ("हलचल", "हिल", "हिलना", "हिलता", "हिलती", "हरकत", "मूवमेंट", "किक", "फड़क", "movement",
                "movements", "moment", "moving", "kicking", "halchal", "hil", "hilna", "hilta", "hilti", "harkat",
-               "kick", "kicks")
+               "kick", "kicks",
+               # dialect: "हिलत / डोलत" (Bhojpuri, Chhattisgarhi)
+               "हिलत", "हिलथे", "डोलत", "डोलना", "hilat", "dolat")
 FETAL_REDUCED = ("कम", "नहीं", "नही", "बंद", "धीमा", "kam", "nahi", "nahin", "band", "less", "reduced",
-                 "decreased", "no", "not", "slow")
+                 "decreased", "no", "not", "slow", "नइ", "नइखे", "कमती", "naikhe", "kamti")
 FETAL_NOT_REDUCED = ("कम नहीं", "kam nahi", "not less", "not reduced")
 # Explicit "it's fine" wording. Movement is only "normal" when one of these is said;
 # a mention with neither reduced nor normal wording is "unclear" and gets asked again.
@@ -134,6 +173,7 @@ DOSE_ORDINALS = {
     "बूस्टर": 3, "booster": 3,
 }
 
+DAYS_PER_MONTH = 30  # "agle mahine" / "2 mahine baad" -> 30 days per month for scheduling
 MONTH_WORDS = r"(?:महीने|महीना|माह|months?|mahine|mahina|maheene|maah)"
 WEEK_WORDS = r"(?:हफ्ते|हफ्ता|सप्ताह|weeks?|hafte|hafta)"
 LATER_WORDS = r"(?:बाद|baad|bad|later|after|पहले|pehle|ago)"
@@ -150,12 +190,15 @@ PREG_ORDINALS = {
 
 VISIT_TERMS = ("विजिट", "विज़िट", "मुलाकात", "आऊंगी", "आउंगी", "आएंगे", "दोबारा", "फिर से", "अगली", "जांच",
                "चेकअप", "visit", "aaungi", "aungi", "dobara", "phir se", "agli", "next", "checkup",
-               "check up", "milenge", "aana", "aayenge")
+               "check up", "milenge", "aana", "aayenge", "आबो", "आइब", "aabo", "aaib")
 WEEKDAYS = {
-    0: ("सोमवार", "somvar", "monday"), 1: ("मंगलवार", "mangalvar", "tuesday"),
-    2: ("बुधवार", "budhvar", "wednesday"), 3: ("गुरुवार", "guruvar", "thursday"),
-    4: ("शुक्रवार", "shukravar", "friday"), 5: ("शनिवार", "shanivar", "saturday"),
-    6: ("रविवार", "ravivar", "sunday"),
+    0: ("सोमवार", "somvar", "somwar", "monday"),
+    1: ("मंगलवार", "mangalvar", "mangalwar", "tuesday"),
+    2: ("बुधवार", "budhvar", "budhwar", "wednesday"),
+    3: ("गुरुवार", "बृहस्पतिवार", "वीरवार", "guruvar", "guruwar", "brihaspativar", "veervar", "thursday"),
+    4: ("शुक्रवार", "shukravar", "shukrawar", "friday"),
+    5: ("शनिवार", "shanivar", "shaniwar", "saturday"),
+    6: ("रविवार", "इतवार", "ravivar", "raviwar", "itwar", "itvar", "itvaar", "sunday"),
 }
 
 # Devanagari "यस"/"ओके"/"नो" are what a hi-IN recogniser writes for spoken English yes/ok/no.
@@ -331,7 +374,10 @@ def _date_in(clause: str, today: date) -> date | None:
     m = re.search(rf"(\d{{1,2}})\s*{WEEK_WORDS}\s*(?:बाद|baad|bad|में|me|later|after)", clause)
     if m:
         return today + timedelta(weeks=int(m.group(1)))
-    m = re.search(r"(\d{1,2})\s*(?:तारीख|tarikh|tareekh|date)", clause)
+    m = re.search(rf"(\d{{1,2}})\s*{MONTH_WORDS}\s*(?:बाद|baad|bad|later|after)", clause)
+    if m:
+        return today + timedelta(days=DAYS_PER_MONTH * int(m.group(1)))
+    m = re.search(r"(\d{1,2})\s*(?:तारीख|tarikh|tareekh|tarik|date)", clause)
     if m and 1 <= int(m.group(1)) <= 31:
         day = int(m.group(1))
         year, month = (today.year, today.month) if day > today.day else \
@@ -341,6 +387,8 @@ def _date_in(clause: str, today: date) -> date | None:
                 return date(year, month, day)
             except ValueError:
                 year, month = year + month // 12, month % 12 + 1
+    if _any(clause, ("नरसों", "narso", "narson")):  # the day after the day after tomorrow
+        return today + timedelta(days=3)
     if _any(clause, ("परसों", "parso", "parson", "day after tomorrow")):
         return today + timedelta(days=2)
     if _any(clause, ("कल", "kal", "tomorrow")):
@@ -348,7 +396,7 @@ def _date_in(clause: str, today: date) -> date | None:
     if _any(clause, ("अगले हफ्ते", "अगले सप्ताह", "agle hafte", "next week")):
         return today + timedelta(weeks=1)
     if _any(clause, ("अगले महीने", "agle mahine", "next month")):
-        return today + timedelta(days=30)
+        return today + timedelta(days=DAYS_PER_MONTH)
     for weekday, names in WEEKDAYS.items():
         if _any(clause, names):
             return today + timedelta(days=(weekday - today.weekday() - 1) % 7 + 1)
@@ -365,29 +413,115 @@ def parse_next_visit(clauses: list[str], today: date) -> date | None:
                 return found
     # Unambiguous future phrases count even without the word "visit".
     for clause in clauses:
-        if _any(clause, ("अगले हफ्ते", "agle hafte", "next week", "परसों", "parso")) or \
-                re.search(r"(?:दिन|din|days?|हफ्ते|hafte|weeks?)\s*(?:बाद|baad|later)", clause):
+        if _any(clause, ("अगले हफ्ते", "agle hafte", "next week", "परसों", "parso", "नरसों", "narso",
+                         "अगले महीने", "agle mahine")) or \
+                re.search(r"(?:दिन|din|days?|हफ्ते|hafte|weeks?|महीने|mahine|months?)\s*(?:बाद|baad|later)", clause):
             return _date_in(clause, today)
     return None
 
 
-def match_beneficiary(text: str, people: Iterable[KnownBeneficiary]) -> KnownBeneficiary | None:
-    best, best_score, tie = None, 0, False
+# ---- beneficiary matching: exact, then fuzzy (small spelling / transliteration differences)
+CONFIDENT_FULL_NAME = 0.85   # similarity of the whole spoken name to a known name
+CONFIDENT_FIRST_NAME = 0.9   # similarity of a first name alone (needs a longer name, see below)
+MIN_FIRST_NAME_CHARS = 4     # "Anu" vs "Anju" is too short to trust on a first name alone
+SUGGEST_BELOW = 0.72         # below this a name is not even offered as "did you mean…?"
+AMBIGUITY_MARGIN = 0.05      # two women this close in score: ask which one, never pick
+
+_LONG_TO_SHORT = str.maketrans({"ी": "ि", "ू": "ु", "ा": "", "ं": "", "ँ": "", "्": ""})
+_ROMAN_SOUNDS = (("ee", "i"), ("oo", "u"), ("aa", "a"), ("w", "v"), ("z", "j"), ("ph", "f"), ("sh", "s"),
+                 ("q", "k"), ("y", "i"))
+_HONORIFICS = frozenset({"श्रीमती", "shrimati", "smt", "mrs", "बहन", "didi", "दीदी", "bai", "बाई"})
+_NAME_STOP = frozenset({"के", "का", "की", "को", "ने", "से", "घर", "ka", "ki", "ke", "ko", "ne", "se", "ghar",
+                        "आज", "aaj", "मैं", "main", "मैंने", "maine", "गई", "gayi", "gai", "visit", "विजिट", "bp",
+                        "बीपी", "pregnant", "गर्भवती", "हां", "haan", "नहीं", "nahi", "is", "the", "went", "to", "home"})
+
+
+def _skeleton(word: str) -> str:
+    """Spelling-insensitive key: सुनिता = सुनीता, Sunitaa = Sunita, Dhruv = Druw."""
+    w = fold(word.lower()).strip(".,!?।")
+    if re.search(r"[\u0900-\u097f]", w):
+        return w.translate(_LONG_TO_SHORT)
+    for a, b in _ROMAN_SOUNDS:
+        w = w.replace(a, b)
+    w = re.sub(r"([bcdfgjklmnpqrstvx])h", r"\1", w)  # aspirates: dh->d, kh->k, bh->b
+    return re.sub(r"(.)\1+", r"\1", w)            # doubled letters
+
+
+def _similar(a: str, b: str) -> float:
+    return difflib.SequenceMatcher(None, _skeleton(a), _skeleton(b)).ratio()
+
+
+def _same_script(a: str, b: str) -> bool:
+    return bool(re.search(r"[\u0900-\u097f]", a)) == bool(re.search(r"[\u0900-\u097f]", b))
+
+
+def _name_score(words: list[str], name: str) -> float:
+    """Best similarity between `name` and any run of words in the note (same script only)."""
+    parts = name.lower().split()
+    if not parts:
+        return 0.0
+    best = 0.0
+    for i in range(len(words)):
+        window = words[i:i + len(parts)]
+        if len(window) == len(parts) and _same_script(window[0], parts[0]):
+            best = max(best, _similar(" ".join(window), " ".join(parts)))
+        if len(parts[0]) >= MIN_FIRST_NAME_CHARS and _same_script(words[i], parts[0]):
+            first = _similar(words[i], parts[0])
+            # a first name alone must be very close to count as much as a full name
+            best = max(best, first * (CONFIDENT_FULL_NAME / CONFIDENT_FIRST_NAME))
+    return best
+
+
+@dataclass(frozen=True)
+class NameMatch:
+    person: KnownBeneficiary | None
+    suggestions: tuple[int, ...]  # close but not confident: "did you mean…?"
+    heard: str | None             # the spoken name when nobody matched confidently
+
+
+def heard_name(raw_text: str) -> str | None:
+    """The name she most likely said: the first 1–3 name-like words of the note."""
+    words = []
+    for token in normalize_numbers(raw_text).split():
+        word = token.strip(".,!?।:;\"'")
+        low = fold(word.lower())
+        if not words and low in _HONORIFICS:
+            continue
+        if not word or any(ch.isdigit() for ch in word) or low in _NAME_STOP or len(words) == 3:
+            break
+        words.append(word)
+        if token.endswith((",", "।", ".")):
+            break
+    name = " ".join(words)
+    return name if len(name) >= 2 else None
+
+
+def match_beneficiary(text: str, people: Iterable[KnownBeneficiary], raw_text: str = "") -> NameMatch:
+    """Exact name -> that woman. Otherwise a confident fuzzy match, else no guess: close names
+    become suggestions and the spoken name is returned so the app can offer "add as new"."""
+    people = list(people)
+    words = [w.strip(".,!?।:;") for w in text.split()]
+    scored: list[tuple[float, KnownBeneficiary]] = []
     for person in people:
-        score = 0
+        score = 0.0
         for name in (person.name_hi, person.name_en, *person.aliases):
             name = _preprocess(name)
             if not name:
                 continue
             if re.search(_term_regex(name), text):
-                score = max(score, 3)
+                score = max(score, 1.0)
             elif re.search(_term_regex(name.split()[0]), text):
-                score = max(score, 2)
-        if score > best_score:
-            best, best_score, tie = person, score, False
-        elif score and score == best_score:
-            tie = True
-    return None if tie else best
+                score = max(score, CONFIDENT_FULL_NAME + 0.1)  # exact first name
+            else:
+                score = max(score, _name_score(words, name))
+        scored.append((score, person))
+    scored.sort(key=lambda sp: sp[0], reverse=True)
+    best_score, best = scored[0] if scored else (0.0, None)
+    tie = len(scored) > 1 and best_score - scored[1][0] < AMBIGUITY_MARGIN
+    if best is not None and best_score >= CONFIDENT_FULL_NAME and not tie:
+        return NameMatch(best, (), None)
+    suggestions = tuple(p.id for score, p in scored if score >= SUGGEST_BELOW)[:3]
+    return NameMatch(None, suggestions, heard_name(raw_text or text))
 
 
 # --------------------------------------------------------------------------- public API
@@ -398,10 +532,13 @@ def parse_visit(text: str, today: date, people: Iterable[KnownBeneficiary] = ())
     bp = parse_bp(norm)
     ifa_taking, ifa_tablets = parse_ifa(clauses)
     td_dose, vaccine_given = parse_td(clauses)
-    person = match_beneficiary(norm, people)
+    names = match_beneficiary(norm, people, text)
+    person = names.person
     return VisitFields(
         beneficiary_id=person.id if person else None,
         beneficiary_name=person.name_hi if person else None,
+        beneficiary_name_heard=None if person else names.heard,
+        beneficiary_suggestions=list(names.suggestions),
         pregnancy_month=parse_pregnancy_month(norm),
         bp_systolic=bp.systolic,
         bp_diastolic=bp.diastolic,
@@ -430,7 +567,8 @@ def merge_correction(base: VisitFields, new: VisitFields) -> tuple[VisitFields, 
     """Merge a spoken correction into an entry. Only what the correction actually says
     changes; symptoms are added; the matched woman is kept unless a new one is named."""
     merged, changed = base.model_dump(), False
-    skip = {"beneficiary_name", "beneficiary_name_en", "bp_unclear", "bp_heard", "symptoms"}
+    skip = {"beneficiary_name", "beneficiary_name_en", "beneficiary_name_heard", "beneficiary_suggestions",
+            "bp_unclear", "bp_heard", "symptoms"}
     for key, value in new.model_dump().items():
         if key in skip or value is None or value == merged[key]:
             continue

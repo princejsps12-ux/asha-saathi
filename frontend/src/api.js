@@ -64,6 +64,7 @@ export const api = {
   // `base`: the current entry, when the transcript is a spoken correction ("BP 150 by 100")
   extract: (transcript, base = null) => post('/api/extract', base ? { transcript, base } : { transcript }),
   evaluate: (fields) => post('/api/evaluate', { fields }),
+  addBeneficiary: (name, village = '') => post('/api/beneficiaries', { name, village }),
   intent: (text) => post('/api/intent', { text }),
   saveVisit: (transcript, fields) => post('/api/visits', { transcript, fields }),
   resetDemo: () => post('/api/demo/reset', {}),

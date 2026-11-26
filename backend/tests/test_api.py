@@ -10,7 +10,7 @@ from app.seed import SAMPLES
 from tests.conftest import make_settings
 
 
-def test_health_and_offline_status(client):
+def test_health_and_no_key_status(client):
     assert client.get("/api/health").json() == {"ok": True}
     status = client.get("/api/status").json()
     assert status["offline_mode"] is True and status["stt"] == "browser" and status["extraction"] == "rules"
@@ -80,7 +80,7 @@ def test_gemini_failure_falls_back_to_parser(tmp_path, monkeypatch):
     monkeypatch.setattr(integrations.httpx, "post", boom)
     client = TestClient(create_app(make_settings(tmp_path, gemini_api_key="fake")))
     res = client.post("/api/extract", json={"transcript": SAMPLES[1]["text"]}).json()
-    assert res["engine"] == "rules" and "offline parser" in res["engine_note"]
+    assert res["engine"] == "rules" and "built-in parser" in res["engine_note"]
     assert res["fields"]["hb"] == 9.5
 
 

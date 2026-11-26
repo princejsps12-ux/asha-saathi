@@ -1,4 +1,4 @@
-"""Unit tests for the offline Hindi / Hinglish / English parser — one block per rule."""
+"""Unit tests for the built-in (no API key) Hindi / Hinglish / English parser — one block per rule."""
 from __future__ import annotations
 
 from datetime import date, timedelta

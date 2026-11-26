@@ -27,6 +27,9 @@ class VisitFields(BaseModel):
     beneficiary_id: int | None = None
     beneficiary_name: str | None = None
     beneficiary_name_en: str | None = None
+    # No confident match: the name as spoken (offer "add as new woman?") and close candidates.
+    beneficiary_name_heard: str | None = Field(None, max_length=80)
+    beneficiary_suggestions: list[int] = Field(default_factory=list)
     pregnancy_month: int | None = Field(None, ge=1, le=10)
     bp_systolic: int | None = Field(None, ge=50, le=260)
     bp_diastolic: int | None = Field(None, ge=30, le=180)
@@ -79,6 +82,7 @@ class Analysis(BaseModel):
     engine: Literal["rules", "gemini+rules"] = "rules"
     engine_note: str | None = None
     unclear: list[str] = Field(default_factory=list)  # fields to ask again: "bp", "fetal_movement"
+    suggestions: list[dict] = Field(default_factory=list)  # [{id, name_hi, name_en, …}] for "did you mean…?"
     changed: bool = True  # for a correction: did it add or change anything?
 
 
@@ -89,3 +93,9 @@ class VisitCreate(BaseModel):
 
 class IntentRequest(BaseModel):
     text: str = Field(..., max_length=500)
+
+
+class BeneficiaryCreate(BaseModel):
+    """A new woman added from the visit screen ("नई लाभार्थी जोड़ें?")."""
+    name: str = Field(..., min_length=2, max_length=60)
+    village: str = Field("", max_length=60)

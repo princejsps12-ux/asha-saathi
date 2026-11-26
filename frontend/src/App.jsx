@@ -3,8 +3,11 @@ import { api, toUiError } from './api.js'
 import { loadMode, mainLang, saveMode } from './i18n.js'
 import { Bi, LangContext, LangToggle, useI18n } from './lang.jsx'
 import { ErrorBoundary, ErrorNote } from './components/Feedback.jsx'
+import { flushQueue, queuedVisits } from './syncQueue.js'
 import RecordView from './components/RecordView.jsx'
 import { DueView, HighRiskView, PeopleList, PersonDetail } from './components/Lists.jsx'
+
+const SYNC_EVERY_MS = 30000 // also retry the offline queue every 30 s while the app is open
 
 const TABS = [
   { id: 'record', icon: '🎤', key: 'tabVisit' },
@@ -63,6 +66,24 @@ function Shell() {
   }, [])
 
   const refresh = useCallback(() => setVersion((v) => v + 1), [])
+  const [queued, setQueued] = useState(() => queuedVisits().length)
+
+  // Visits saved on the phone while offline are sent when the network returns.
+  useEffect(() => {
+    let running = false
+    const sync = async () => {
+      if (running || !queuedVisits().length) return
+      running = true
+      const { sent, left } = await flushQueue(api.saveVisit)
+      running = false
+      setQueued(left)
+      if (sent) refresh()
+    }
+    sync()
+    window.addEventListener('online', sync)
+    const timer = setInterval(sync, SYNC_EVERY_MS)
+    return () => { window.removeEventListener('online', sync); clearInterval(timer) }
+  }, [refresh])
   useEffect(() => {
     api.beneficiaries().then(setPeople).catch((e) => setFatal(toUiError(e)))
     Promise.all([api.due(), api.highRisk()])
@@ -93,6 +114,7 @@ function Shell() {
         <div className="topbar-right">
           <LangToggle />
           <StatusBadges status={status} />
+          {queued > 0 && <span className="badge badge-sync" role="status"><Bi k="syncPending" vars={{ n: queued }} inline /></span>}
         </div>
       </header>
 
@@ -107,7 +129,8 @@ function Shell() {
                 <button type="button" className="link" onClick={() => setPreset(null)}><Bi k="clear" /></button></p>
             )}
             <RecordView status={status} people={people || []} symptomLabels={symptomLabels} samples={samples}
-              preset={preset} onSaved={() => { setPreset(null); refresh() }} />
+              preset={preset} onSaved={() => { setPreset(null); refresh() }}
+              onQueued={(n) => setQueued(n)} onPeopleChanged={refresh} />
           </>
         )}
         {tab === 'people' && (openId
@@ -124,6 +147,7 @@ function Shell() {
         <footer className="foot">
           <button type="button" className="link" onClick={resetDemo}><Bi k="resetDemo" /></button>
           <Bi k="footerRules" />
+          <Bi k="modeNote" className="mode-note" />
         </footer>
       </main>
 

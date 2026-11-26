@@ -1,0 +1,10 @@
+{
+  "name": "ASHA Saathi · आशा साथी",
+  "short_name": "आशा साथी",
+  "description": "Voice-first home-visit register for ASHA / Mitanin workers",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f3ec",
+  "theme_color": "#0b6e4f",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

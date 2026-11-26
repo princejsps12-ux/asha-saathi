@@ -134,3 +134,13 @@ Reported on a phone: transcript "Sunita Sahu सात महीने BP 150 �
 - [x] Clear "सुन रही हूँ… / Listening…" indicator (blinking red dot, hint) and a big red **बस ✓ / Done** button to finish early
 - [x] Finish by voice: "बस" / "bas" / "done" at the end of a phrase, or "हो गया" / "ho gaya" said on its own after a pause ("टीका हो गया" mid-sentence does not end it); the command is removed before extraction
 - [x] Tests: speech.test.js (3 s pause kept, restart + append on every pause, early give-up restarted), dictation.test.js (commands, false positives, stripping, pause detection), component tests (Done button, "हो गया") → 72 vitest + 211 pytest in Docker
+
+## Real-world hardening (2026-11-27)
+- [x] **Honesty:** "offline mode" wording replaced everywhere (UI badge + footer, README, .env.example, compose, logs, API note) with: "No API keys needed; speech uses the browser's built-in recognition (needs internet); extraction and danger rules run fully on our server."
+- [x] **Offline save queue:** a confirmed visit that can't reach the server is kept on the phone (localStorage) and synced on reconnect / every 30 s, with a header badge; rejected items are kept, never dropped. Un-extracted words are kept as a draft that survives a refresh and auto-retries when online. A service worker + manifest let the app open with no network
+- [x] **Unsupported browsers:** "इस ब्राउज़र में आवाज़ नहीं चलती - Chrome खोलें / Voice not supported here - use Chrome" + type-in box + Try sample
+- [x] **Mic denied / network mid-speech:** bilingual guidance (🔒 → allow mic), type-in opens; heard words always kept; fixed: "no speech" no longer overwrites mic guidance
+- [x] **New vs existing woman:** fuzzy matching across scripts/spellings with an ambiguity margin; never guesses — "क्या आपका मतलब…? / Did you mean…?" chips and "नई लाभार्थी जोड़ें? / Add as new woman?" with the spoken name; POST /api/beneficiaries (no duplicates)
+- [x] **Dates:** नरसों (+3), X महीने बाद, more weekday spellings (बृहस्पतिवार, इतवार, somwar…)
+- [x] **Dialect + noise:** Chhattisgarhi/Bhojpuri swelling, headache, bleeding, fever, fetal-movement words and negations (नइ, नइखे); fillers dropped, repeated fragments collapsed
+- [x] Tests: test_hardening.py, syncQueue/draft/honesty tests, RecordView.hardening.test.jsx → 263 pytest + 86 vitest, all in Docker; checked in a 375 px viewport

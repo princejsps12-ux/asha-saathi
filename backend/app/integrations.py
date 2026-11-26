@@ -1,5 +1,5 @@
 """Optional paid-API upgrades. Each one is used only if its key is set and
-always degrades to the offline path on any error (timeout, quota, outage).
+always degrades to the no-key path (built-in parser) on any error (timeout, quota, outage).
 """
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:ge
 
 
 class IntegrationError(RuntimeError):
-    """Raised when an optional API is unavailable; callers fall back to offline mode."""
+    """Raised when an optional API is unavailable; callers fall back to the built-in parser."""
 
 
 # ------------------------------------------------------------------ Sarvam STT
