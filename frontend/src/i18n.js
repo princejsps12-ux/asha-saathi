@@ -63,7 +63,9 @@ export const STRINGS = {
     loading: 'लोड हो रहा है…',
 
     phase_idle: 'माइक दबाकर विज़िट बोलें',
-    phase_listening: 'सुन रही हूँ… बोलती रहिए',
+    phase_listening: 'सुन रही हूँ…',
+    listeningHint: 'रुककर सोच सकती हैं। ख़त्म होने पर "बस" या "हो गया" बोलें, या नीचे बटन दबाएँ',
+    doneButton: 'बस ✓',
     phase_thinking: 'समझ रही हूँ…',
     phase_speaking: 'सुनिए, क्या यह सही है?',
     phase_confirming: '"हाँ" या "नहीं" बोलिए',
@@ -159,7 +161,9 @@ export const STRINGS = {
     loading: 'Loading…',
 
     phase_idle: 'Tap the mic and describe the visit',
-    phase_listening: 'Listening… pause to finish',
+    phase_listening: 'Listening…',
+    listeningHint: 'Pause to think any time. When finished, say "bas" or "ho gaya", or tap the button',
+    doneButton: 'Done ✓',
     phase_thinking: 'Extracting fields…',
     phase_speaking: 'Reading back — is this correct?',
     phase_confirming: 'Say “yes” to save or “no” to edit',

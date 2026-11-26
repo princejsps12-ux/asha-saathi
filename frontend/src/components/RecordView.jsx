@@ -4,9 +4,13 @@ import { CONFIRM_LISTEN, listenForAnswer, micAction, resolveAnswer } from '../co
 import { translate } from '../i18n.js'
 import { RISK_ICON } from '../labels.js'
 import { Bi, useI18n } from '../lang.jsx'
+import { createEndDetector, stripEndCommand } from '../dictation.js'
 import { clearPending, loadPending, savePending } from '../pendingVisit.js'
 import { forSpeech } from '../spokenText.js'
-import { browserSttSupported, listen, recordAudio, recorderSupported, speak, speechLang, stopSpeaking } from '../speech.js'
+import {
+  DICTATION_MAX_RESTARTS, DICTATION_SILENCE_MS, DICTATION_START_TIMEOUT_MS, browserSttSupported, listen, recordAudio,
+  recorderSupported, speak, speechLang, stopSpeaking,
+} from '../speech.js'
 import AlertList from './AlertList.jsx'
 import { ErrorNote } from './Feedback.jsx'
 import FieldsCard from './FieldsCard.jsx'
@@ -33,6 +37,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   const [retrying, setRetrying] = useState(false)
   const [heardAnswer, setHeardAnswer] = useState('')
   const [slow, setSlow] = useState(false)
+  const [dictating, setDictating] = useState(false)
   const [sampleIndex, setSampleIndex] = useState(0)
   const handle = useRef(null)
   const presetRef = useRef(preset)
@@ -55,6 +60,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     handle.current = null
     stopSpeaking()
     setRetrying(false)
+    setDictating(false)
     return flow.current
   }
 
@@ -208,21 +214,44 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     newVisit()
     if (useServerStt) return startServerStt()
     const id = flow.current
+    const endDetector = createEndDetector()
+    let endCommand = null // "बस" / "हो गया" said as a command: removed before extraction
     setPhase('listening')
-    handle.current = listen({
+    setDictating(true)
+    const dictation = listen({
       lang: voice,
-      onText: (text) => id === flow.current && setTranscript(text),
+      // Real ASHAs pause to think: only ~3.5 s of silence ends the note; mobile engines that
+      // stop at each pause are restarted and the text is appended.
+      silenceMs: DICTATION_SILENCE_MS,
+      startTimeoutMs: DICTATION_START_TIMEOUT_MS,
+      maxRestarts: DICTATION_MAX_RESTARTS,
+      onText: (text) => {
+        if (id !== flow.current) return
+        setTranscript(text)
+        const command = endDetector.update(text)
+        if (command && !endCommand) {
+          endCommand = command
+          dictation.stop() // she said "बस" / "हो गया": finish now
+        }
+      },
       onError: (code) => id === flow.current && setError(speechError(code)),
       onEnd: (text) => {
         if (id !== flow.current) return
+        setDictating(false)
         // Never lose words that were already on screen (some mobile engines end with no final result).
-        const heard = text || transcriptRef.current
+        const heard = stripEndCommand(text || transcriptRef.current, endCommand)
         setTranscript(heard)
         if (heard.trim()) setError(null) // an engine error after speech doesn't matter: we have text
         process(heard)
       },
     })
+    handle.current = dictation
     return undefined
+  }
+
+  /** The big "बस / Done" button: finish dictating now, keeping everything said. */
+  function finishDictation() {
+    handle.current?.stop()
   }
 
   /** Re-run extraction on the transcript already on screen (e.g. after a network error). */
@@ -308,7 +337,14 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
               : <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z" />}
           </svg>
         </button>
-        <Bi k={phaseKey} className="phase" />
+        {phase === 'listening' && dictating ? (
+          <div className="listening" role="status" aria-live="polite">
+            <span className="listening-dot" aria-hidden />
+            <Bi k="phase_listening" className="phase" />
+            <small className="phase-sub"><Bi k="listeningHint" /></small>
+            <button type="button" className="btn btn-done" onClick={finishDictation}><Bi k="doneButton" /></button>
+          </div>
+        ) : <Bi k={phaseKey} className="phase" />}
         {phase === 'review' && pending && <small className="phase-sub"><Bi k="reviewSub" /></small>}
         {phase === 'confirming' && heardAnswer && <p className="heard">“{heardAnswer}”</p>}
         {!canListen && <p className="warn"><Bi k="noStt" /></p>}

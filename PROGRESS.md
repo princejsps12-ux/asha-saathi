@@ -128,3 +128,9 @@ Reported on a phone: transcript "Sunita Sahu सात महीने BP 150 �
 - [x] The hi-IN voice read "FRU" as "फ्लू". All spoken text now goes through `forSpeech()` (frontend/src/spokenText.js), applied only to speech; the screen is unchanged
 - [x] Hindi: FRU → "एफ़-आर-यू यानी बड़े अस्पताल", PHC → "पी-एच-सी", ANM/IFA/Td/BP spelled out, " / " → "या"; English: FRU → "F-R-U, the first referral hospital", P-H-C, B-P "150 over 100", Hb → haemoglobin, units spoken in full, " / " → "or"
 - [x] Tests: spokenText.test.js (real rule/read-back strings; no Latin abbreviation left in Hindi speech) + component test (speech spelled out, screen still shows FRU) → 61 vitest + 211 pytest in Docker
+
+## Thinking pauses in dictation (2026-11-27)
+- [x] Dictation now ends only after ~3.5 s of silence (was 2.5 s); a phone that ends the session at each pause, or before speech starts, is restarted (up to 20 times) and the text appended
+- [x] Clear "सुन रही हूँ… / Listening…" indicator (blinking red dot, hint) and a big red **बस ✓ / Done** button to finish early
+- [x] Finish by voice: "बस" / "bas" / "done" at the end of a phrase, or "हो गया" / "ho gaya" said on its own after a pause ("टीका हो गया" mid-sentence does not end it); the command is removed before extraction
+- [x] Tests: speech.test.js (3 s pause kept, restart + append on every pause, early give-up restarted), dictation.test.js (commands, false positives, stripping, pause detection), component tests (Done button, "हो गया") → 72 vitest + 211 pytest in Docker

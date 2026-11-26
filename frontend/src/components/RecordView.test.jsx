@@ -13,6 +13,9 @@ import RecordView from './RecordView.jsx'
 const script = vi.hoisted(() => [])
 
 vi.mock('../speech.js', () => ({
+  DICTATION_SILENCE_MS: 3500,
+  DICTATION_START_TIMEOUT_MS: 10000,
+  DICTATION_MAX_RESTARTS: 20,
   browserSttSupported: true,
   recorderSupported: false,
   speechLang: (lang) => (lang === 'en' ? 'en-IN' : 'hi-IN'),
@@ -22,11 +25,22 @@ vi.mock('../speech.js', () => ({
   listen: vi.fn((opts) => {
     // A script item is the text heard, or { shown, final } for an engine that displays words
     // (interim) but ends with a different / empty final result, as mobile engines do.
+    // { phrases, gapMs } speaks several phrases with pauses and keeps listening until stop().
     const item = script.length ? script.shift() : ''
-    const { shown, final } = typeof item === 'string' ? { shown: item, final: item } : item
+    const { shown, final, phrases, gapMs = 0 } = typeof item === 'string' ? { shown: item, final: item } : item
     let ended = false
     const end = (value) => { if (!ended) { ended = true; opts.onEnd(value) } }
-    setTimeout(() => { if (shown) opts.onText?.(shown); end(final) }, 0)
+    if (phrases) {
+      let text = ''
+      phrases.forEach((phrase, i) => setTimeout(() => {
+        if (ended) return
+        vi.setSystemTime(Date.now() + gapMs) // the pause before this phrase
+        text = [text, phrase].filter(Boolean).join(' ')
+        opts.onText?.(text)
+      }, i))
+    } else {
+      setTimeout(() => { if (shown) opts.onText?.(shown); end(final) }, 0)
+    }
     return { stop: () => end('') }
   }),
 }))
@@ -220,5 +234,35 @@ describe('spoken read-back vs on-screen text', () => {
     expect(spoken).toContain('एफ़-आर-यू यानी बड़े अस्पताल')
     expect(spoken).not.toContain('FRU')
     expect(document.querySelector('.readback-text').textContent).toContain('/ FRU रेफ़र करें') // screen unchanged
+  })
+})
+
+describe('dictation with thinking pauses', () => {
+  afterEach(() => vi.useRealTimers())
+  const NOTE_PARTS = ['सुनीता साहू सात महीने', 'BP 150 बाय 100', 'अगले हफ्ते फिर आऊंगी']
+  const NOTE = NOTE_PARTS.join(' ')
+
+  it('listens with a ~3.5 s silence window and shows "सुन रही हूँ…" with a big बस / Done button', async () => {
+    script.push({ phrases: NOTE_PARTS, gapMs: 2000 }, '', '')
+    render(<RecordView {...props} onSaved={vi.fn()} />)
+    fireEvent.click(mic())
+    expect(listen.mock.calls[0][0].silenceMs).toBeGreaterThanOrEqual(3000)
+    expect(screen.getByText('सुन रही हूँ…')).toBeTruthy()
+    const done = screen.getByRole('button', { name: /बस ✓/ })
+    await waitFor(() => expect(screen.getByText(NOTE)).toBeTruthy()) // pauses did not end it
+    expect(api.extract).not.toHaveBeenCalled()
+    fireEvent.click(done) // finish early
+    await waitForAnswerPrompt()
+    expect(api.extract.mock.calls[0]).toEqual([NOTE]) // everything said was kept
+  })
+
+  it('saying "हो गया" after a pause finishes the note, and the command is not extracted', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    script.push({ phrases: [...NOTE_PARTS, 'हो गया'], gapMs: 1500 }, '', '')
+    render(<RecordView {...props} onSaved={vi.fn()} />)
+    fireEvent.click(mic())
+    await waitForAnswerPrompt()
+    expect(api.extract.mock.calls[0]).toEqual([NOTE])
+    expect(screen.getByText(NOTE)).toBeTruthy()
   })
 })

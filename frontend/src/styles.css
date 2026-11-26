@@ -279,3 +279,15 @@ h1, h2, h3 { margin: 0; }
 .phase-sub .bi { align-items: center; }
 .heard { margin: 4px 0 0; font-size: .95rem; color: var(--green-dark); font-style: italic; }
 .notice { margin: 0; background: var(--amber-soft); color: var(--amber); padding: 10px 14px; border-radius: 12px; }
+
+/* Dictation in progress: unmistakable "listening" state with a big Done button. */
+.listening { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 10px; }
+.listening .phase { margin: 0; }
+.listening .phase .bi-main { color: var(--red); font-size: 1.3rem; }
+.listening-dot { width: 14px; height: 14px; border-radius: 50%; background: var(--red); animation: blinkdot 1s ease-in-out infinite; }
+@keyframes blinkdot { 50% { opacity: .25; transform: scale(.8); } }
+.listening .phase-sub { max-width: 320px; text-align: center; }
+.listening .phase-sub .bi { align-items: center; }
+.btn-done { min-height: 64px; min-width: 200px; font-size: 1.3rem; background: var(--red); color: #fff; border-radius: 16px; margin-top: 6px; }
+.btn-done .bi { align-items: center; }
+.btn-done .bi-sub { color: rgba(255, 255, 255, .85); }

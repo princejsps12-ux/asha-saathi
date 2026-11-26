@@ -20,6 +20,11 @@ export const speechLang = (uiLang) => (uiLang === 'en' ? 'en-IN' : 'hi-IN')
 const FATAL_ERRORS = new Set(['not-allowed', 'service-not-allowed', 'audio-capture'])
 const QUIET_ERRORS = new Set(['aborted', 'no-speech']) // normal on silence / stop: not shown
 export const END_SAFETY_MS = 1500 // after stop(), report what we have even if onend never fires
+// Dictation: real ASHAs pause to think, so a visit note only ends after ~3.5 s of silence
+// (or "बस" / "हो गया" / the Done button). The yes / no answer uses its own, shorter window.
+export const DICTATION_SILENCE_MS = 3500
+export const DICTATION_START_TIMEOUT_MS = 10000
+export const DICTATION_MAX_RESTARTS = 20
 
 /**
  * Text from a SpeechRecognitionResultList (or any array of {isFinal, 0: {transcript}}).
@@ -53,6 +58,7 @@ export function listen({
   lang = 'hi-IN', onText, onEnd, onError, silenceMs = 2500, startTimeoutMs = 8000, maxRestarts = 3,
   RecognitionImpl = Recognition, now = () => Date.now(),
 }) {
+  const startedAt = now()
   let committed = '' // text from earlier sessions of this same listen() (after mobile restarts)
   let current = ''   // text of the running session
   let heardAt = 0
@@ -93,9 +99,10 @@ export function listen({
     }
     rec.onend = () => {
       if (ended) return
-      // Engine ended on its own while she was still talking: keep the text, listen on.
-      const midSentence = heardAt && now() - heardAt < silenceMs
-      if (!stoppedByUs && midSentence && restarts < maxRestarts) {
+      // The engine ended on its own (mobile does this at every pause, or after a few silent
+      // seconds) but our own silence window hasn't run out: keep the text, listen on.
+      const withinWindow = heardAt ? now() - heardAt < silenceMs : now() - startedAt < startTimeoutMs
+      if (!stoppedByUs && withinWindow && restarts < maxRestarts) {
         restarts += 1
         committed = full()
         current = ''

@@ -32,7 +32,7 @@ The cost of a late entry is clinical, not clerical. **High BP, bleeding, severe 
    - The visit is also kept in the browser (localStorage), so a **page refresh restores it**. Only a save, or **＋ New visit** (which asks first), clears it.
 8. Open **📅 कल (Due)**: Rekha now appears in *due tomorrow*. Open **⚠️ Risk**: she is on the high-risk list.
 9. Tap **Try sample** until *Real speech-to-text — unclear BP* comes up. This is the exact text Chrome produced from a real recording, with "150" heard as "15" and कम as काम. The BP field turns amber, nothing is guessed, and the read-back asks for the BP again.
-10. With a mic: tap the big button and say something like
+10. With a mic: tap the big button and speak at your own pace. Pauses of up to about 3 seconds to think are fine: the app shows **"सुन रही हूँ… / Listening…"** and keeps listening. Finish by saying **"बस"** or **"हो गया"**, or tap the big **बस ✓ / Done** button. Say something like
    *"Sunita Sahu, saat mahine, BP 150 by 100, pairon mein sujan hai, baby movement kam hai, agle hafte phir aaungi"*.
 
 If something was misheard, tap that field to fix it. Most fields are big tap-buttons (month 1–9, symptoms, dates like कल/परसों), so even corrections rarely need typing.

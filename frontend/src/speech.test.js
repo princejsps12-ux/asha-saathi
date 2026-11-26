@@ -1,6 +1,8 @@
 // Fake speech engines that reproduce real mobile behaviour (Android Chrome, iOS Safari/Chrome).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { END_SAFETY_MS, collectTranscript, listen, speak } from './speech.js'
+import {
+  DICTATION_MAX_RESTARTS, DICTATION_SILENCE_MS, DICTATION_START_TIMEOUT_MS, END_SAFETY_MS, collectTranscript, listen, speak,
+} from './speech.js'
 
 const PHONE_TEXT = 'Sunita Sahu सात महीने BP 150 बाय 100 पैरों में सूजन है, बेबी मूवमेंट कम है, अगले हफ्ते फिर आऊंगी'
 /** onEnd must fire exactly once, with exactly this text. */
@@ -109,5 +111,59 @@ describe('speak waits until the phone has really stopped talking', () => {
     synth.speaking = false
     await vi.advanceTimersByTimeAsync(1000)
     expect(done).toBe(true)
+  })
+})
+
+describe('dictation tolerates thinking pauses (DICTATION_SILENCE_MS)', () => {
+  const opts = (engine, onEnd) => ({
+    onEnd, RecognitionImpl: engine.FakeRecognition, silenceMs: DICTATION_SILENCE_MS,
+    startTimeoutMs: DICTATION_START_TIMEOUT_MS, maxRestarts: DICTATION_MAX_RESTARTS,
+  })
+
+  it('a 3-second pause does not end the note; ~3.5 s of silence does', () => {
+    const engine = fakeEngine()
+    const onEnd = vi.fn()
+    listen(opts(engine, onEnd))
+    engine.latest().say(res('सुनीता साहू', true))
+    vi.advanceTimersByTime(3000) // thinking…
+    expect(engine.latest().stopped).toBe(false)
+    engine.latest().say(res('सुनीता साहू', true), res('सात महीने', true))
+    vi.advanceTimersByTime(3000)
+    expect(engine.latest().stopped).toBe(false)
+    vi.advanceTimersByTime(600) // now 3.6 s of silence
+    expect(engine.latest().stopped).toBe(true)
+    engine.latest().end()
+    calledOnceWith(onEnd, 'सुनीता साहू सात महीने')
+  })
+
+  it('a phone that ends the session at every short pause is restarted each time and the text appended', () => {
+    const engine = fakeEngine()
+    const onEnd = vi.fn()
+    listen(opts(engine, onEnd))
+    const words = ['सुनीता साहू', 'सात महीने', 'BP 150 बाय 100', 'पैरों में सूजन है', 'बेबी मूवमेंट कम है', 'अगले हफ्ते फिर आऊंगी']
+    for (const w of words) {
+      engine.latest().say(res(w, true))
+      vi.advanceTimersByTime(1500) // short pause…
+      engine.latest().end()        // …and the phone ends the session on its own
+    }
+    expect(engine.sessions.length).toBe(words.length + 1) // restarted after every early end
+    expect(onEnd).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(DICTATION_SILENCE_MS)
+    engine.latest().end()
+    calledOnceWith(onEnd, words.join(' '))
+  })
+
+  it('an engine that gives up before she starts speaking is restarted within the start window', () => {
+    const engine = fakeEngine()
+    const onEnd = vi.fn()
+    listen(opts(engine, onEnd))
+    vi.advanceTimersByTime(4000)
+    engine.latest().error('no-speech')
+    engine.latest().end() // Android: ~4 s of silence ends the session
+    expect(engine.sessions).toHaveLength(2)
+    engine.latest().say(res('सुनीता साहू सात महीने', true))
+    vi.advanceTimersByTime(DICTATION_SILENCE_MS + 10)
+    engine.latest().end()
+    calledOnceWith(onEnd, 'सुनीता साहू सात महीने')
   })
 })
