@@ -10,10 +10,26 @@ export const PAUSE_MS = 1200 // a gap this long starts a new spoken phrase
 // Only as a whole phrase on its own (also ordinary Hindi inside a sentence):
 const ALONE_ONLY = ['हो गया', 'हो गई', 'हो गयी', 'ho gaya', 'ho gayi', 'ho gaya hai', 'हो गया है']
 // Also at the end of a longer phrase ("…फिर आऊंगी बस"):
-const AT_PHRASE_END = ['बस', 'bas', 'done', 'बस हो गया', 'bas ho gaya', 'हो गया बस', 'ho gaya bas', 'बस इतना',
-  'बस इतना ही', "that's all", 'thats all']
+const AT_PHRASE_END = [
+  'बस',
+  'bas',
+  'done',
+  'बस हो गया',
+  'bas ho gaya',
+  'हो गया बस',
+  'ho gaya bas',
+  'बस इतना',
+  'बस इतना ही',
+  "that's all",
+  'thats all',
+]
 
-const clean = (text) => String(text || '').toLowerCase().replace(/[।.!?,]+/g, ' ').replace(/\s+/g, ' ').trim()
+const clean = (text) =>
+  String(text || '')
+    .toLowerCase()
+    .replace(/[।.!?,]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 
 /** If `phrase` (what was said since the last pause) is an end command, that command; else null. */
 export function endCommandIn(phrase) {
@@ -27,8 +43,13 @@ export function endCommandIn(phrase) {
 /** Remove a trailing end command (and its punctuation) from the full transcript. */
 export function stripEndCommand(text, command) {
   if (!command) return String(text || '').trim()
-  const words = command.split(' ').map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')
-  return String(text || '').replace(new RegExp(`[\\s,।.]*${words}[\\s।.!?,]*$`, 'i'), '').trim()
+  const words = command
+    .split(' ')
+    .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('\\s+')
+  return String(text || '')
+    .replace(new RegExp(`[\\s,।.]*${words}[\\s।.!?,]*$`, 'i'), '')
+    .trim()
 }
 
 /**

@@ -2,9 +2,23 @@ line-length = 120
 target-version = "py312"
 
 [lint]
-# pyflakes, pycodestyle, isort, bugbear, pyupgrade, simplify, naming
-select = ["F", "E", "W", "I", "B", "UP", "SIM", "N"]
+# pyflakes, pycodestyle, isort, bugbear, pyupgrade, simplify, naming, type annotations
+select = ["F", "E", "W", "I", "B", "UP", "SIM", "N", "ANN"]
+ignore = [
+  "ANN401", # `Any` is used on purpose for raw JSON from optional external APIs
+  "SIM905", # long Hindi word lists read better as one string than as a list literal
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["ANN"] # test functions and fixtures don't need annotations
 
 [lint.flake8-bugbear]
 # FastAPI's documented dependency-injection pattern, not a mutable default.
 extend-immutable-calls = ["fastapi.Depends", "fastapi.File"]
+
+[format]
+# Keep short word lists on as few lines as fit, instead of one item per line.
+skip-magic-trailing-comma = true
+
+[lint.isort]
+split-on-trailing-comma = false # matches format.skip-magic-trailing-comma

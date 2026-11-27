@@ -3,6 +3,7 @@
 Every key is optional. With no keys the app runs in "no-key mode":
 browser speech recognition + the built-in rule-based parser.
 """
+
 from __future__ import annotations
 
 import os

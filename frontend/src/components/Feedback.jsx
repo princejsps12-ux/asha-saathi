@@ -5,7 +5,9 @@ import { Bi } from '../lang.jsx'
 export function ErrorNote({ error }) {
   if (!error) return null
   return (
-    <p className="error" role="alert"><Bi k={error.k} vars={error.vars} always /></p>
+    <p className="error" role="alert">
+      <Bi k={error.k} vars={error.vars} always />
+    </p>
   )
 }
 
@@ -31,9 +33,15 @@ export class ErrorBoundary extends Component {
     if (!this.state.crashed) return this.props.children
     return (
       <div className="crash" role="alert">
-        <p className="crash-icon" aria-hidden>🩺</p>
-        <h2><Bi k="crashTitle" always /></h2>
-        <p><Bi k="crashBody" always /></p>
+        <p className="crash-icon" aria-hidden>
+          🩺
+        </p>
+        <h2>
+          <Bi k="crashTitle" always />
+        </h2>
+        <p>
+          <Bi k="crashBody" always />
+        </p>
         <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>
           <Bi k="reload" always />
         </button>

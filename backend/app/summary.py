@@ -1,5 +1,6 @@
 """Read-back text (spoken by browser TTS) and an English gloss, both built only from
 the extracted fields (no API key, no extra service) and always match what will be saved."""
+
 from __future__ import annotations
 
 from datetime import date
@@ -7,8 +8,7 @@ from datetime import date
 from .rules import CLARIFY_CODES
 from .schemas import SYMPTOM_LABELS, Alert, VisitFields
 
-HINDI_MONTHS = ("जनवरी", "फ़रवरी", "मार्च", "अप्रैल", "मई", "जून", "जुलाई", "अगस्त", "सितंबर",
-                "अक्टूबर", "नवंबर", "दिसंबर")
+HINDI_MONTHS = ("जनवरी", "फ़रवरी", "मार्च", "अप्रैल", "मई", "जून", "जुलाई", "अगस्त", "सितंबर", "अक्टूबर", "नवंबर", "दिसंबर")
 EN_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
 QUESTION_HI = "क्या यह सही है? हाँ या नहीं बोलिए।"
@@ -110,8 +110,7 @@ def _english_parts(f: VisitFields, alerts: list[Alert], today: date, suggested: 
     if f.temperature_f is not None:
         parts.append(f"Temperature {f.temperature_f:g} °F")
     if f.symptoms:
-        parts.append("Symptoms: " + ", ".join(SYMPTOM_LABELS[s][1].lower() for s in f.symptoms
-                                               if s in SYMPTOM_LABELS))
+        parts.append("Symptoms: " + ", ".join(SYMPTOM_LABELS[s][1].lower() for s in f.symptoms if s in SYMPTOM_LABELS))
     else:
         parts.append("No symptoms reported")
     if f.fetal_movement == "unclear":

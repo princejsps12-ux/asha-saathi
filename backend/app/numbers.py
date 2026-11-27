@@ -4,6 +4,7 @@ Speech recognisers return numbers inconsistently: "140", "१४०", "एक �
 "ek sau chalis", "साढ़े आठ". `normalize_numbers` rewrites all of them to ASCII
 digits so the field parser only ever has to deal with one representation.
 """
+
 from __future__ import annotations
 
 import re
@@ -16,6 +17,9 @@ def fold(text: str) -> str:
     text = unicodedata.normalize("NFD", text).replace("़", "")
     return unicodedata.normalize("NFC", text).replace("ँ", "ं")
 
+
+# Hand-packed word lists: easier to scan than one word per line.
+# fmt: off
 # Devanagari 1..99 in order (index + 1 = value). Hindi numbers are irregular,
 # so a lookup table is the only reliable approach.
 _DEVANAGARI_1_99 = (
@@ -77,6 +81,7 @@ UNIT_WORDS = {
     "mahine", "mahina", "month", "months", "hafte", "hafta", "week", "weeks", "din", "days",
     "day", "saal", "goli", "goliyan", "tablet", "tablets", "kilo", "kg", "tarikh", "baje",
 }
+# fmt: on
 
 _DEVANAGARI_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
 _TOKEN_RE = re.compile(r"\S+")
@@ -114,7 +119,7 @@ def normalize_numbers(text: str) -> str:
             half, i = True, i + 1
             word = _clean(tokens[i])
         if word in STANDALONE_HUNDRED:  # "बटा सौ" -> 100
-            out.append("100" + tokens[i][len(tokens[i].rstrip(_STRIP)):])
+            out.append("100" + tokens[i][len(tokens[i].rstrip(_STRIP)) :])
             i += 1
             continue
         if not (half or _is_number_start(tokens, i)):
@@ -122,16 +127,16 @@ def normalize_numbers(text: str) -> str:
             i += 1
             continue
         value = NUMBER_WORDS[word]
-        trailing = tokens[i][len(tokens[i].rstrip(_STRIP)):]
+        trailing = tokens[i][len(tokens[i].rstrip(_STRIP)) :]
         i += 1
         # "एक सौ चालीस" -> 1 * 100 + 40
         if i < len(tokens) and _clean(tokens[i]) in HUNDRED_WORDS:
             value *= 100
-            trailing = tokens[i][len(tokens[i].rstrip(_STRIP)):]
+            trailing = tokens[i][len(tokens[i].rstrip(_STRIP)) :]
             i += 1
             if i < len(tokens) and _clean(tokens[i]) in NUMBER_WORDS:
                 value += NUMBER_WORDS[_clean(tokens[i])]
-                trailing = tokens[i][len(tokens[i].rstrip(_STRIP)):]
+                trailing = tokens[i][len(tokens[i].rstrip(_STRIP)) :]
                 i += 1
         out.append((f"{value}.5" if half else str(value)) + trailing)
     return " ".join(out)

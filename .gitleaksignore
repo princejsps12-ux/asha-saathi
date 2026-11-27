@@ -1,0 +1,2 @@
+# localStorage key names (e.g. "asha.pendingVisit.v1"), not secrets
+908e1cfea96d30ab7086ef9381c41330e5fed0f8:frontend/src/pendingVisit.js:generic-api-key:6

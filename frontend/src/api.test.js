@@ -4,7 +4,10 @@ import { ApiError, RETRY_DELAY_MS, api } from './api.js'
 const ok = (body) => ({ ok: true, status: 200, json: async () => body })
 const fail = (status) => ({ ok: false, status, json: async () => ({ detail: `HTTP ${status}` }) })
 
-beforeEach(() => { vi.useFakeTimers(); globalThis.fetch = vi.fn() })
+beforeEach(() => {
+  vi.useFakeTimers()
+  globalThis.fetch = vi.fn()
+})
 afterEach(() => vi.useRealTimers())
 
 describe('API requests survive a sleeping free-tier server', () => {

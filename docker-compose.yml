@@ -1,5 +1,7 @@
-# One command, no keys needed:   docker compose up
-# Run the test suite:            docker compose run --rm app pytest
+# One command, no keys needed:   docker compose up            -> open http://localhost:8000
+# Lint and all tests run inside every build. To run the tests again on their own:
+#   docker compose run --rm test        (backend: pytest)
+#   docker compose run --rm test-web    (frontend: vitest)
 services:
   app:
     build: .
@@ -17,6 +19,16 @@ services:
     volumes:
       - asha-data:/data
     restart: unless-stopped
+
+  test:
+    profiles: [test]
+    build: { context: ., target: api-test }
+    command: pytest -v -p no:cacheprovider
+
+  test-web:
+    profiles: [test]
+    build: { context: ., target: web }
+    command: npx vitest run
 
 volumes:
   asha-data:

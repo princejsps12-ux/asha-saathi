@@ -1,6 +1,7 @@
 """Optional paid-API upgrades. Each one is used only if its key is set and
 always degrades to the no-key path (built-in parser) on any error (timeout, quota, outage).
 """
+
 from __future__ import annotations
 
 import json
@@ -82,8 +83,7 @@ def _clean_llm_fields(raw: dict[str, Any], known_ids: set[int]) -> dict[str, Any
     return clean
 
 
-def gemini_extract(transcript: str, people: list[KnownBeneficiary], today: date,
-                   settings: Settings) -> dict[str, Any]:
+def gemini_extract(transcript: str, people: list[KnownBeneficiary], today: date, settings: Settings) -> dict[str, Any]:
     if not settings.gemini_enabled:
         raise IntegrationError("GEMINI_API_KEY not set")
     body = {
@@ -91,8 +91,12 @@ def gemini_extract(transcript: str, people: list[KnownBeneficiary], today: date,
         "generationConfig": {"responseMimeType": "application/json", "temperature": 0},
     }
     try:
-        resp = httpx.post(GEMINI_URL.format(model=settings.gemini_model), json=body,
-                          headers={"x-goog-api-key": settings.gemini_api_key}, timeout=settings.api_timeout_s)
+        resp = httpx.post(
+            GEMINI_URL.format(model=settings.gemini_model),
+            json=body,
+            headers={"x-goog-api-key": settings.gemini_api_key},
+            timeout=settings.api_timeout_s,
+        )
         resp.raise_for_status()
         text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
         raw = json.loads(text)

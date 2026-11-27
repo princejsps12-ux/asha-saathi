@@ -1,16 +1,37 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_MODE, MODES, MODE_LABELS, STORAGE_KEY, STRINGS, addDays, detectMode, formatDate, linesFor, loadMode, mainLang,
-  saveMode, translate,
+  DEFAULT_MODE,
+  MODES,
+  MODE_LABELS,
+  STORAGE_KEY,
+  STRINGS,
+  addDays,
+  detectMode,
+  formatDate,
+  linesFor,
+  loadMode,
+  mainLang,
+  saveMode,
+  translate,
 } from './i18n.js'
 
 const memoryStorage = (initial = {}) => {
   const data = { ...initial }
-  return { getItem: (k) => data[k] ?? null, setItem: (k, v) => { data[k] = v }, data }
+  return {
+    getItem: (k) => data[k] ?? null,
+    setItem: (k, v) => {
+      data[k] = v
+    },
+    data,
+  }
 }
 const brokenStorage = {
-  getItem: () => { throw new Error('SecurityError') },
-  setItem: () => { throw new Error('QuotaExceeded') },
+  getItem: () => {
+    throw new Error('SecurityError')
+  },
+  setItem: () => {
+    throw new Error('QuotaExceeded')
+  },
 }
 
 describe('display mode', () => {
@@ -88,8 +109,10 @@ describe('translations', () => {
   })
   it('is honest about what needs internet: no "offline mode" claims anywhere', () => {
     expect(translate('en', 'offlineBadge')).toBe('No API keys needed')
-    expect(translate('en', 'modeNote')).toBe("No API keys needed; speech uses the browser's built-in recognition "
-      + '(needs internet); extraction and danger rules run fully on our server.')
+    expect(translate('en', 'modeNote')).toBe(
+      "No API keys needed; speech uses the browser's built-in recognition " +
+        '(needs internet); extraction and danger rules run fully on our server.',
+    )
     for (const lang of ['hi', 'en']) {
       for (const [key, text] of Object.entries(STRINGS[lang])) {
         expect(/offline mode|ऑफ़लाइन मोड/i.test(text), `${lang}.${key}`).toBe(false)

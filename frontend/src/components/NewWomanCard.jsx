@@ -14,7 +14,8 @@ export default function NewWomanCard({ fields, suggestions, onPick, onAdded }) {
 
   async function add() {
     if (name.trim().length < 2) return
-    setBusy(true); setError(null)
+    setBusy(true)
+    setError(null)
     try {
       const person = await api.addBeneficiary(name.trim(), village.trim())
       onAdded(person)
@@ -29,7 +30,9 @@ export default function NewWomanCard({ fields, suggestions, onPick, onAdded }) {
     <section className="card new-woman" aria-live="polite">
       {suggestions?.length > 0 && (
         <div className="did-you-mean">
-          <h3><Bi k="didYouMean" always inline /></h3>
+          <h3>
+            <Bi k="didYouMean" always inline />
+          </h3>
           <div className="choices">
             {suggestions.map((s) => (
               <button key={s.id} type="button" className="chip" onClick={() => onPick(s.id)}>
@@ -41,14 +44,20 @@ export default function NewWomanCard({ fields, suggestions, onPick, onAdded }) {
       )}
       {fields.beneficiary_name_heard && (
         <div className="add-new">
-          <h3>👩 <Bi k="newWomanTitle" always inline /></h3>
+          <h3>
+            👩 <Bi k="newWomanTitle" always inline />
+          </h3>
           <label>
             <Bi k="newWomanName" inline />
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder={plain('newWomanName')} />
           </label>
           <label>
             <Bi k="newWomanVillage" inline />
-            <input value={village} onChange={(e) => setVillage(e.target.value)} placeholder={plain('newWomanVillage')} />
+            <input
+              value={village}
+              onChange={(e) => setVillage(e.target.value)}
+              placeholder={plain('newWomanVillage')}
+            />
           </label>
           <div className="actions">
             <button type="button" className="btn btn-primary" onClick={add} disabled={busy || name.trim().length < 2}>
@@ -62,7 +71,9 @@ export default function NewWomanCard({ fields, suggestions, onPick, onAdded }) {
         </div>
       )}
       {!fields.beneficiary_name_heard && !suggestions?.length && (
-        <p className="muted"><Bi k="selectFirst" /></p>
+        <p className="muted">
+          <Bi k="selectFirst" />
+        </p>
       )}
     </section>
   )

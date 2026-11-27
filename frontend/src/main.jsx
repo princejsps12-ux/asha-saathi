@@ -12,6 +12,8 @@ createRoot(document.getElementById('root')).render(
 // Offline app shell (production builds only; dev server stays uncached).
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => { /* app still works without it */ })
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* app still works without it */
+    })
   })
 }

@@ -1,8 +1,9 @@
 import js from '@eslint/js'
-import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
 import globals from 'globals'
 
+// ESLint 10 tracks JSX references itself, so unused imports and components are caught
+// without eslint-plugin-react (which does not support ESLint 10 yet).
 export default [
   { ignores: ['dist'] },
   {
@@ -13,14 +14,10 @@ export default [
       globals: { ...globals.browser, ...globals.node },
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
-    settings: { react: { version: '18.3' } },
-    plugins: { react, 'react-hooks': reactHooks },
+    plugins: { 'react-hooks': reactHooks },
     rules: {
       ...js.configs.recommended.rules,
-      ...react.configs.recommended.rules,
-      ...react.configs['jsx-runtime'].rules,
       ...reactHooks.configs.recommended.rules,
-      'react/prop-types': 'off', // small app, no TypeScript; props are documented inline
     },
   },
 ]

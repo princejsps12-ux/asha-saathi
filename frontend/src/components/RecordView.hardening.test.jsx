@@ -14,8 +14,11 @@ vi.mock('../speech.js', () => ({
   DICTATION_SILENCE_MS: 3500,
   DICTATION_START_TIMEOUT_MS: 10000,
   DICTATION_MAX_RESTARTS: 20,
-  get browserSttSupported() { return engine.supported },
+  get browserSttSupported() {
+    return engine.supported
+  },
   recorderSupported: false,
+  RECOGNITION_LANG: 'hi-IN',
   speechLang: (lang) => (lang === 'en' ? 'en-IN' : 'hi-IN'),
   speak: vi.fn(() => Promise.resolve()),
   stopSpeaking: vi.fn(),
@@ -24,7 +27,12 @@ vi.mock('../speech.js', () => ({
   listen: vi.fn((opts) => {
     const item = engine.script.length ? engine.script.shift() : {}
     let ended = false
-    const end = (value) => { if (!ended) { ended = true; opts.onEnd(value) } }
+    const end = (value) => {
+      if (!ended) {
+        ended = true
+        opts.onEnd(value)
+      }
+    }
     setTimeout(() => {
       if (item.shown) opts.onText?.(item.shown)
       if (item.error) opts.onError?.(item.error)
@@ -36,7 +44,11 @@ vi.mock('../speech.js', () => ({
 
 vi.mock('../api.js', () => {
   class ApiError extends Error {
-    constructor(key, status = 0) { super(key); this.key = key; this.status = status }
+    constructor(key, status = 0) {
+      super(key)
+      this.key = key
+      this.status = status
+    }
   }
   return {
     ApiError,
@@ -47,14 +59,40 @@ vi.mock('../api.js', () => {
 
 const NOTE = 'सुनीता साहू सात महीने BP 150 बाय 100'
 const FIELDS = {
-  beneficiary_id: 1, beneficiary_name: 'सुनीता साहू', beneficiary_name_en: 'Sunita Sahu', beneficiary_name_heard: null,
-  beneficiary_suggestions: [], pregnancy_month: 7, bp_systolic: 150, bp_diastolic: 100, bp_unclear: false,
-  bp_heard: null, hb: null, weight_kg: null, temperature_f: null, symptoms: [], fetal_movement: null,
-  ifa_taking: null, ifa_tablets: null, td_dose: null, vaccine_given: null, next_visit_date: null,
+  beneficiary_id: 1,
+  beneficiary_name: 'सुनीता साहू',
+  beneficiary_name_en: 'Sunita Sahu',
+  beneficiary_name_heard: null,
+  beneficiary_suggestions: [],
+  pregnancy_month: 7,
+  bp_systolic: 150,
+  bp_diastolic: 100,
+  bp_unclear: false,
+  bp_heard: null,
+  hb: null,
+  weight_kg: null,
+  temperature_f: null,
+  symptoms: [],
+  fetal_movement: null,
+  ifa_taking: null,
+  ifa_tablets: null,
+  td_dose: null,
+  vaccine_given: null,
+  next_visit_date: null,
 }
 const analysisOf = (fields, extra = {}) => ({
-  fields, alerts: [], risk: 'normal', summary_hi: 'सारांश', summary_en: 'Summary', gloss_en: 'Gloss',
-  engine: 'rules', engine_note: null, unclear: [], suggestions: [], changed: true, ...extra,
+  fields,
+  alerts: [],
+  risk: 'normal',
+  summary_hi: 'सारांश',
+  summary_en: 'Summary',
+  gloss_en: 'Gloss',
+  engine: 'rules',
+  engine_note: null,
+  unclear: [],
+  suggestions: [],
+  changed: true,
+  ...extra,
 })
 const props = {
   status: { stt: 'browser', today: '2026-11-27' },
@@ -63,7 +101,10 @@ const props = {
   samples: [{ id: 's', label_hi: 'नमूना ·', label_en: 'Sample', text: NOTE }],
   preset: null,
 }
-const offline = async () => { const { ApiError } = await import('../api.js'); return new ApiError('err_unreachable') }
+const offline = async () => {
+  const { ApiError } = await import('../api.js')
+  return new ApiError('err_unreachable')
+}
 const mic = () => document.querySelector('.mic')
 
 beforeEach(() => {
@@ -85,7 +126,7 @@ describe('2. browser without speech recognition (Firefox, some iOS)', () => {
     expect(screen.getByText('इस ब्राउज़र में आवाज़ नहीं चलती - Chrome खोलें')).toBeTruthy()
     expect(screen.getByText('Voice not supported here - use Chrome')).toBeTruthy()
     expect(screen.getByText('▶ नमूना चलाएँ')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /नमूना · Sample/ })).toBeTruthy() // samples still available
+    expect(screen.getByRole('button', { name: /नमूना ·\s*\/\s*Sample/ })).toBeTruthy() // samples still available
     fireEvent.change(screen.getByRole('textbox', { name: /लिखकर दर्ज करें/ }), { target: { value: NOTE } })
     fireEvent.click(screen.getByRole('button', { name: /जानकारी निकालें/ }))
     await waitFor(() => expect(api.extract).toHaveBeenCalledWith(NOTE))
@@ -143,8 +184,13 @@ describe('1. offline: nothing is lost', () => {
 })
 
 describe('4. a woman who is not on the list', () => {
-  const unknown = { ...FIELDS, beneficiary_id: null, beneficiary_name: null, beneficiary_name_en: null,
-    beneficiary_name_heard: 'Anita Devi' }
+  const unknown = {
+    ...FIELDS,
+    beneficiary_id: null,
+    beneficiary_name: null,
+    beneficiary_name_en: null,
+    beneficiary_name_heard: 'Anita Devi',
+  }
 
   it('asks "नई लाभार्थी जोड़ें?" with her spoken name, adds her and links the visit', async () => {
     api.extract.mockResolvedValue(analysisOf(unknown))
@@ -162,9 +208,14 @@ describe('4. a woman who is not on the list', () => {
   })
 
   it('a close-but-unsure name is offered as "क्या आपका मतलब:", never chosen automatically', async () => {
-    api.extract.mockResolvedValue(analysisOf({ ...unknown, beneficiary_name_heard: 'Sunitha Sahni' }, {
-      suggestions: [{ id: 1, name_hi: 'सुनीता साहू', name_en: 'Sunita Sahu', village: 'कुरुद', village_en: 'Kurud' }],
-    }))
+    api.extract.mockResolvedValue(
+      analysisOf(
+        { ...unknown, beneficiary_name_heard: 'Sunitha Sahni' },
+        {
+          suggestions: [{ id: 1, name_hi: 'सुनीता साहू', name_en: 'Sunita Sahu', village: 'कुरुद', village_en: 'Kurud' }],
+        },
+      ),
+    )
     engine.script.push({ shown: 'Sunitha Sahni', final: 'Sunitha Sahni' }, {}, {})
     render(<RecordView {...props} />)
     fireEvent.click(mic())
@@ -177,11 +228,30 @@ describe('4. a woman who is not on the list', () => {
 
 describe('Try sample: every sample is listed and can be picked directly', () => {
   const SAMPLES = [
-    { id: 'hindi_red', label_hi: 'खतरे के संकेत · हिंदी', label_en: 'Danger signs · Hindi', text: 'रेखा वर्मा बीपी 142 बटा 92' },
-    { id: 'hinglish_amber', label_hi: 'खून की कमी · हिंग्लिश', label_en: 'Anaemia · Hinglish', text: 'Sunita Sahu Hb saadhe nau' },
-    { id: 'english_bleeding', label_hi: 'खून आना · अंग्रेज़ी', label_en: 'Bleeding · English', text: 'Kamla Dhruw bleeding' },
-    { id: 'real_stt_unclear', label_hi: 'बीपी साफ़ नहीं · असली STT', label_en: 'Unclear BP · real STT',
-      text: 'सुनीता साहू 7 महीने बीपी 15 बाय 100' },
+    {
+      id: 'hindi_red',
+      label_hi: 'खतरे के संकेत · हिंदी',
+      label_en: 'Danger signs · Hindi',
+      text: 'रेखा वर्मा बीपी 142 बटा 92',
+    },
+    {
+      id: 'hinglish_amber',
+      label_hi: 'खून की कमी · हिंग्लिश',
+      label_en: 'Anaemia · Hinglish',
+      text: 'Sunita Sahu Hb saadhe nau',
+    },
+    {
+      id: 'english_bleeding',
+      label_hi: 'खून आना · अंग्रेज़ी',
+      label_en: 'Bleeding · English',
+      text: 'Kamla Dhruw bleeding',
+    },
+    {
+      id: 'real_stt_unclear',
+      label_hi: 'बीपी अस्पष्ट · असली STT',
+      label_en: 'Unclear BP · real STT',
+      text: 'सुनीता साहू 7 महीने बीपी 15 बाय 100',
+    },
   ]
 
   it('shows all samples at once as bilingual buttons and runs the one tapped', async () => {
@@ -195,5 +265,44 @@ describe('Try sample: every sample is listed and can be picked directly', () => 
     }
     fireEvent.click(screen.getByRole('button', { name: /Unclear BP · real STT/ })) // pick it directly
     await waitFor(() => expect(api.extract).toHaveBeenCalledWith(SAMPLES[3].text))
+  })
+})
+
+describe('judge review fixes', () => {
+  it('chatter with no visit details ("hello") says what to say: no fake woman, no empty read-back', async () => {
+    api.extract.mockResolvedValue(
+      analysisOf({
+        ...FIELDS,
+        beneficiary_id: null,
+        beneficiary_name: null,
+        beneficiary_name_en: null,
+        beneficiary_name_heard: 'hello',
+        pregnancy_month: null,
+        bp_systolic: null,
+        bp_diastolic: null,
+      }),
+    )
+    engine.supported = false
+    render(<RecordView {...props} />)
+    fireEvent.change(screen.getByRole('textbox', { name: /लिखकर दर्ज करें/ }), { target: { value: 'hello' } })
+    fireEvent.click(screen.getByRole('button', { name: /जानकारी निकालें/ }))
+    expect(await screen.findByText(/No visit details found/)).toBeTruthy()
+    expect(screen.getByText(/विज़िट की कोई जानकारी समझ नहीं आई/)).toBeTruthy()
+    expect(screen.queryByText('नई लाभार्थी जोड़ें?')).toBeNull()
+    expect(screen.queryByRole('button', { name: /हाँ ✓/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /दोबारा कोशिश करें/ })).toBeNull() // retrying would not help
+  })
+
+  it('mic blocked while waiting for "हाँ": a short note points to the Yes / No buttons, not a scary error', async () => {
+    engine.script.push(
+      { shown: NOTE, final: NOTE },
+      { error: 'not-allowed', final: '' },
+      { error: 'not-allowed', final: '' },
+    )
+    render(<RecordView {...props} />)
+    fireEvent.click(mic())
+    expect(await screen.findByText('Mic not available — tap Yes or No above')).toBeTruthy()
+    expect(screen.queryByText(/allow the microphone/)).toBeNull()
+    expect(screen.getByRole('button', { name: /हाँ ✓/ })).toBeTruthy() // the visit is still pending
   })
 })

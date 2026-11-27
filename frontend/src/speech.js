@@ -14,7 +14,12 @@ export const browserSttSupported = Boolean(Recognition)
 export const ttsSupported = typeof window !== 'undefined' && 'speechSynthesis' in window
 export const recorderSupported = typeof window !== 'undefined' && 'MediaRecorder' in window
 
-/** BCP-47 tag for speech in the UI language. Indian English still copes with Hinglish words. */
+/**
+ * Speech recognition is always Hindi (India): it writes Hindi, Hinglish and English words, so the
+ * voice flow is the same in every language mode. Only the read-back voice follows the toggle.
+ */
+export const RECOGNITION_LANG = 'hi-IN'
+/** BCP-47 tag for the read-back voice in the UI language. */
 export const speechLang = (uiLang) => (uiLang === 'en' ? 'en-IN' : 'hi-IN')
 
 const FATAL_ERRORS = new Set(['not-allowed', 'service-not-allowed', 'audio-capture'])
@@ -38,10 +43,14 @@ export function collectTranscript(results) {
   for (let i = 0; i < results.length; i++) {
     const text = String(results[i]?.[0]?.transcript || '').trim()
     if (!text) continue
-    if (!results[i].isFinal) { interims.push(text); continue }
+    if (!results[i].isFinal) {
+      interims.push(text)
+      continue
+    }
     const prev = finals[finals.length - 1]
-    if (prev && text.startsWith(prev)) finals[finals.length - 1] = text // cumulative repeat
-    else if (!(prev && prev.startsWith(text))) finals.push(text)        // skip a shorter duplicate
+    if (prev && text.startsWith(prev))
+      finals[finals.length - 1] = text // cumulative repeat
+    else if (!(prev && prev.startsWith(text))) finals.push(text) // skip a shorter duplicate
   }
   const final = finals.join(' ')
   const interim = interims.filter((t) => !final.endsWith(t)).join(' ')
@@ -55,12 +64,19 @@ export function collectTranscript(results) {
  * everything heard — final or interim — even after an error.
  */
 export function listen({
-  lang = 'hi-IN', onText, onEnd, onError, silenceMs = 2500, startTimeoutMs = 8000, maxRestarts = 3,
-  RecognitionImpl = Recognition, now = () => Date.now(),
+  lang = 'hi-IN',
+  onText,
+  onEnd,
+  onError,
+  silenceMs = 2500,
+  startTimeoutMs = 8000,
+  maxRestarts = 3,
+  RecognitionImpl = Recognition,
+  now = () => Date.now(),
 }) {
   const startedAt = now()
   let committed = '' // text from earlier sessions of this same listen() (after mobile restarts)
-  let current = ''   // text of the running session
+  let current = '' // text of the running session
   let heardAt = 0
   let restarts = 0
   let stoppedByUs = false
@@ -78,7 +94,11 @@ export function listen({
     clearTimeout(timer)
     timer = setTimeout(() => {
       stoppedByUs = true
-      try { rec.stop() } catch { finish() }
+      try {
+        rec.stop()
+      } catch {
+        finish()
+      }
       setTimeout(finish, END_SAFETY_MS)
     }, ms)
   }
@@ -106,7 +126,12 @@ export function listen({
         restarts += 1
         committed = full()
         current = ''
-        try { start(); return } catch { /* cannot restart: fall through and report */ }
+        try {
+          start()
+          return
+        } catch {
+          /* cannot restart: fall through and report */
+        }
       }
       finish()
     }
@@ -117,7 +142,11 @@ export function listen({
   return {
     stop: () => {
       stoppedByUs = true
-      try { rec.stop() } catch { /* already stopped */ }
+      try {
+        rec.stop()
+      } catch {
+        /* already stopped */
+      }
       setTimeout(finish, END_SAFETY_MS) // never wait forever for onend
     },
   }

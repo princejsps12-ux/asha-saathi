@@ -27,9 +27,14 @@ export async function listenForAnswer(listenOnce, { retries = CONFIRM_LISTEN.ret
   return ''
 }
 
-const tokens = (text) => String(text || '').toLowerCase().normalize('NFC')
-  .replace(/[\u0901]/g, '\u0902')            // chandrabindu -> anusvara (हाँ / हां)
-  .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ').split(' ').filter((t) => t.length > 1)
+const tokens = (text) =>
+  String(text || '')
+    .toLowerCase()
+    .normalize('NFC')
+    .replace(/[\u0901]/g, '\u0902') // chandrabindu -> anusvara (हाँ / हां)
+    .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ')
+    .split(' ')
+    .filter((t) => t.length > 1)
 
 /** Share of the answer's words that also occur in our own read-back (0..1). */
 export function echoShare(answer, readBack) {
@@ -68,7 +73,8 @@ export async function resolveAnswer(answer, result, api) {
   }
   const { intent } = await api.intent(answer).catch(() => ({ intent: 'unknown' }))
   if (intent === 'yes') return { action: 'save' }
-  if (!asking) { // "nahi, BP 150 by 100" or any other spoken fix also counts
+  if (!asking) {
+    // "nahi, BP 150 by 100" or any other spoken fix also counts
     const next = await correction()
     if (next) return { action: 'corrected', analysis: next }
   }

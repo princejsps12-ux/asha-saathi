@@ -45,7 +45,13 @@ export function Bi({ k, vars, hi, en, always = false, inline = false, className 
   return (
     <span className={`bi ${inline ? 'inline' : ''} ${className}`}>
       <span className="bi-main">{main}</span>
-      {sub && <span className="bi-sub" lang="en">{sub}</span>}
+      {/* Screen readers (and accessible names) get "हिंदी / English", not the two lines glued together. */}
+      {sub && <span className="sr-only"> / </span>}
+      {sub && (
+        <span className="bi-sub" lang="en">
+          {sub}
+        </span>
+      )}
     </span>
   )
 }
@@ -56,8 +62,15 @@ export function LangToggle() {
   return (
     <div className="lang-toggle" role="group" aria-label="भाषा / Language">
       {MODES.map((m) => (
-        <button key={m} type="button" aria-pressed={mode === m} className={mode === m ? 'on' : ''}
-          onClick={() => setMode(m)}>{MODE_LABELS[m]}</button>
+        <button
+          key={m}
+          type="button"
+          aria-pressed={mode === m}
+          className={mode === m ? 'on' : ''}
+          onClick={() => setMode(m)}
+        >
+          {MODE_LABELS[m]}
+        </button>
       ))}
     </div>
   )

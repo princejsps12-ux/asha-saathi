@@ -153,3 +153,21 @@ Reported on a phone: transcript "Sunita Sahu सात महीने BP 150 �
 ## Try sample: all samples listed (2026-11-27)
 - [x] The rotating single "Try sample" button is replaced by a compact 2×2 list of bilingual chips under "▶ नमूना चलाएँ / Try sample": खतरे के संकेत · Danger signs, खून की कमी · Anaemia, खून आना · Bleeding, बीपी साफ़ नहीं · Unclear BP (real STT); any one can be picked directly
 - [x] Tests: component test (all 4 chips with Hindi + English labels; tapping "Unclear BP · real STT" runs exactly that text); 90 vitest + 280 pytest in Docker; checked at 375 px
+
+## Final polish (27 Nov 2026) — cold-judge review → fixes
+
+Full findings and fix log: [JUDGE_REVIEW.md](JUDGE_REVIEW.md).
+
+- [x] Cold judge: fresh clone + `docker compose up` (25 s to first page), 360 px phone walkthrough (all 4 sample chips, Yes/No, tabs, 3 language modes, reset), live site incl. cold start (23 s)
+- [x] Reset demo data clears the visit screen and returns to a fresh home screen
+- [x] No console errors / warnings on any screen; touch targets ≥ 44 px; WCAG AA contrast; no cut-off text at 360 px
+- [x] Friendly bilingual states for: nothing understood, mic unavailable on the confirm step, body too large
+- [x] Voice flow identical in all 3 modes (recognition always hi-IN; only the read-back voice changes)
+- [x] Screen readers get "हिंदी / English" instead of glued words
+- [x] API: 64 KB body limit (bilingual 413), symptom codes validated, list sizes capped
+- [x] Dependencies upgraded to supported versions with no known vulnerabilities (FastAPI 0.165 / Starlette 1.10; ESLint 10, Vite 7, Vitest 4); `npm audit` and `pip-audit` clean
+- [x] ruff lint + format (type hints enforced in app code), ESLint 10 + Prettier; sanity ranges named in parser.py
+- [x] Multi-stage Dockerfile: all lint + tests in the build; slim non-root runtime without test tools; healthcheck
+- [x] GitHub Actions CI + badge; MIT LICENSE; gitleaks: no secrets in the repo or history
+- [x] README rewritten for a 30-second read; deck, app, README and video description checked for the same facts
+- [x] Tests: 284 pytest + 96 vitest, all in Docker

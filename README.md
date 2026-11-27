@@ -1,91 +1,146 @@
 # आशा साथी · ASHA Saathi
 
-### ▶ Live demo: **https://asha-saathi-0csj.onrender.com**
-HTTPS, so the microphone works; use Chrome or Edge. No login or keys needed. Press **▶ Try sample** if you have no mic.
-*It's hosted on Render's free tier, so after 15 idle minutes the first visit takes about 50 seconds to wake up. The free disk is temporary, so visits you save reset when the instance sleeps or redeploys, and the 5 demo women are re-seeded automatically. For anything persistent, run it locally with `docker compose up`.*
+[![CI](https://github.com/princejsps12-ux/asha-saathi/actions/workflows/ci.yml/badge.svg)](https://github.com/princejsps12-ux/asha-saathi/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-**Pitch deck (Round 2):** [`deck/ASHA-Saathi-Pitch.pdf`](deck/ASHA-Saathi-Pitch.pdf). The source is `deck/deck.html`; rebuild with `cd deck && npm install && node build.mjs`, and re-capture the live-app screenshots with `node screenshots.mjs`.
+**A voice-first diary for ASHA / Mitanin workers: she speaks the pregnancy home visit in Hindi, the register fills itself, it is read back aloud, saved when she says "हाँ", and danger signs are flagged on the spot, with the reason. No API keys needed.**
 
-**Voice-first visit register for ASHA workers (called Mitanin in Chhattisgarh).**
-She speaks a home visit in Hindi, Hinglish or English. The app fills the register, reads it back in Hindi, saves it when she says "haan", and raises a red alert when it hears a pregnancy danger sign. She never has to type.
+| ▶ Live app | 🎬 Demo video (2:53) | 📑 Pitch deck |
+|---|---|---|
+| **https://asha-saathi-0csj.onrender.com** | **https://www.youtube.com/watch?v=jMKJgxfqYW4** | **[deck/ASHA-Saathi-Pitch.pdf](deck/ASHA-Saathi-Pitch.pdf)** |
 
-> Built for **Scaler × Wispr Flow "Build for Bharat" Round 2**, theme: *Healthcare access*.
+> Built for **Scaler × Wispr Flow "Build for Bharat" Round 2**, theme *Healthcare access*.
+
+## Judge quickstart
+
+```bash
+git clone https://github.com/princejsps12-ux/asha-saathi.git && cd asha-saathi && docker compose up
+```
+
+Then open **http://localhost:8000** (Chrome or Edge for the microphone).
+**No mic? Tap any sample chip** under *▶ नमूना चलाएँ / Try sample*. It runs a real visit note through the whole pipeline: fields, danger alerts, read-back, then tap **हाँ ✓ Yes** to save. Only Docker is needed; no keys, no Node or Python on your machine. Lint and all tests run inside the build.
+
+*The live app is on Render's free tier: after 15 idle minutes the first visit takes about 25–50 s to wake up, and saved visits reset when it sleeps.*
+
+| 1 · Spoken visit → read back | 2 · Danger alert with the reason | 3 · Saved on "हाँ" | 4 · A misheard BP is never guessed |
+|---|---|---|---|
+| <img src="deck/img/02-confirm.png" width="200" alt="Transcript, English gloss and the Yes / No buttons"> | <img src="deck/img/03-alert.png" width="200" alt="Red alert: High BP 142/92 ≥ 140/90, refer today, with the guideline page"> | <img src="deck/img/05-saved.png" width="200" alt="Saved banner after saying yes"> | <img src="deck/img/06-bp-unclear.png" width="200" alt="BP field in amber: not clear, heard 15/100, say again"> |
+
+*Real screenshots of the live app at phone size, in the default **हिं + EN** view.*
 
 ---
 
 ## The problem
 
-India has ~10 lakh ASHAs. Each one covers about 1,000 people and fills a stack of paper registers (ANC, immunisation, home visits) after every visit, often late at night and often copied twice. Typing on a phone in Hindi is slow and error-prone, so data comes in late or incomplete.
+We spoke to **3 Mitanin workers in Gharghoda block (Raigarh, Chhattisgarh)**; their names are kept private. They told us:
 
-The cost of a late entry is clinical, not clerical. **High BP, bleeding, severe anaemia and reduced fetal movement** are the signs that should get a pregnant woman to a PHC *today*. On paper nobody flags them; the record just sits in a register.
+- they keep **3–4 registers** for every pregnant woman
+- paperwork takes **1–2 hours every day**, mostly in the evening or at night
+- the **same data is written twice**: in the register and again on the phone
+- the **network often fails**, so entries are late
 
-**ASHA Saathi turns a 30-second spoken note into a structured register entry, plus a danger-sign check with reasons.**
+> “वही नाम, वही जानकारी फिर डालो।” — *“The same name, the same details — enter them all again.”*
 
-## 1-minute demo
+The cost of a late entry is clinical, not clerical. **High BP, bleeding, severe anaemia and reduced baby movement** are the signs that should get a pregnant woman to a PHC or FRU *today*. On paper nobody flags them at the doorstep.
 
-1. `docker compose up` → open **http://localhost:8000** (use Chrome or Edge for the microphone).
-2. **Language:** the app opens in **हिं + EN** — Hindi as the main text with a smaller English line under every label, button, alert and the read-back summary. Use the header toggle **हिं + EN | हिं | EN** to switch to Hindi-only (an ASHA's everyday view) or English-only (judges). The choice is remembered in the browser (localStorage). The first open is always bilingual; it never guesses from the browser language.
-3. Tap **▶ Try sample** (no microphone needed). A Hindi visit note for *रेखा वर्मा* is typed out like live dictation.
-4. Watch the fields fill in: month 5, BP 142/92, swelling + headache, IFA yes, Td-2, next visit *kal*.
-5. A **red alert** appears: *High BP* + *Pre-eclampsia warning signs*. Each alert says **why** it fired (`BP 142/92 ≥ 140/90`) and **which guideline** it comes from.
-6. Under the Hindi transcript, an **English gloss** of the extracted visit appears (built from the extracted fields, with no API key). The **read-back summary** card shows the Hindi summary with the English one underneath.
-7. The app **reads the summary aloud** (Hindi in हिं + EN / हिं, English in EN), then listens about 9 seconds for **"haan" / "nahi"** (or *yes* / *no*, or a correction such as *"बीपी 150 बाय 100"*). If she pauses, it listens once more automatically. Big **हाँ ✓ Yes / नहीं ✗ No** buttons are always shown as a tap fallback.
-   - **A pending visit is never lost.** If listening stops, the hint reads *"माइक दबाकर हाँ या नहीं बोलें / Tap mic and say yes or no"*. Tapping the mic then listens **only for the answer** and keeps every extracted field.
-   - The visit is also kept in the browser (localStorage), so a **page refresh restores it**. Only a save, or **＋ New visit** (which asks first), clears it.
-8. Open **📅 कल (Due)**: Rekha now appears in *due tomorrow*. Open **⚠️ Risk**: she is on the high-risk list.
-9. Under **▶ नमूना चलाएँ / Try sample**, every sample is listed as its own button: *Danger signs · Hindi*, *Anaemia · Hinglish*, *Bleeding · English*, *Unclear BP · real STT*. Tap **Unclear BP · real STT**. This is the exact text Chrome produced from a real recording, with "150" heard as "15" and कम as काम. The BP field turns amber, nothing is guessed, and the read-back asks for the BP again.
-10. With a mic: tap the big button and speak at your own pace. Pauses of up to about 3 seconds to think are fine: the app shows **"सुन रही हूँ… / Listening…"** and keeps listening. Finish by saying **"बस"** or **"हो गया"**, or tap the big **बस ✓ / Done** button. Say something like
-   *"Sunita Sahu, saat mahine, BP 150 by 100, pairon mein sujan hai, baby movement kam hai, agle hafte phir aaungi"*.
+India has **10.29 lakh ASHAs** (MoHFW Annual Report 2024-25, as on 30 June 2024); Chhattisgarh has **71,000+ Mitanins** (NIC Informatics, Oct 2025). Full sources are in the [pitch deck](deck/ASHA-Saathi-Pitch.pdf), slide 5.
 
-If something was misheard, tap that field to fix it. Most fields are big tap-buttons (month 1–9, symptoms, dates like कल/परसों), so even corrections rarely need typing.
+## How it works
+
+1. **Speak the visit** at your own pace: *"सुनीता साहू, सात महीने, बीपी 150 बाय 100, पैरों में सूजन है, बेबी मूवमेंट कम है, अगले हफ्ते फिर आऊंगी"*. Pauses to think are fine; finish by saying **"बस"** / **"हो गया"** or tapping **बस ✓ Done**.
+2. **The register fills itself**: woman, month, BP, Hb, weight, temperature, symptoms, baby movement, IFA, Td, next visit date. Every field can be fixed with a tap, mostly with big buttons rather than typing.
+3. **Danger-sign check**: each alert says **why** it fired (`BP 150/100 ≥ 140/90`), **what to do** (call 108 / refer to the FRU or a 24-hour PHC) and the **guideline page** it comes from.
+4. **Read back aloud** in Hindi (English in EN mode), then the app listens for **"हाँ" / "नहीं"** or a spoken correction (*"बीपी 150 बाय 100"*). Big **हाँ ✓ / नहीं ✗** buttons are always there too.
+5. **Saved** on "हाँ"; the **due-tomorrow** and **high-risk** lists and the woman's history update.
+
+**Language:** the screen opens in **हिं + EN**: Hindi first, with a smaller English line under every label, so anyone can review it. The header toggle switches to **हिं** (an ASHA's everyday view) or **EN**. The choice is remembered on the phone. The voice flow is the same in every mode: speech is always recognised as Hindi (which also writes Hinglish and English words), and only the read-back voice follows the toggle.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-    subgraph Browser["📱 Browser (React + Vite)"]
-        MIC["🎤 Mic button"] --> STT{"Speech-to-text"}
-        STT -->|default| WSA["Web Speech API<br/>lang = hi-IN"]
-        STT -->|SARVAM_API_KEY set| REC["MediaRecorder → /api/stt"]
-        TTS["🔊 speechSynthesis hi-IN<br/>read-back"]
-        CONF["'haan' / 'nahi'<br/>voice confirm"]
+    subgraph Browser["📱 Phone browser (React + Vite)"]
+        MIC["🎤 Mic"] --> STT["Web Speech API<br/>hi-IN (needs internet)"]
+        TTS["🔊 Read-back<br/>speechSynthesis hi-IN / en-IN"]
+        CONF["'हाँ' / 'नहीं' / correction<br/>or Yes / No buttons"]
+        Q[("Offline save queue<br/>+ pending visit<br/>(localStorage)")]
     end
 
-    subgraph API["🐍 FastAPI (single container)"]
-        EX["/api/extract"] --> PARSER["Rule-based parser<br/>Hindi · Hinglish · English<br/>(always runs)"]
-        EX -.->|GEMINI_API_KEY set| LLM["Gemini extraction<br/>(validated, merged)"]
-        PARSER --> RULES["Danger-sign rules<br/>rules.py — MoHFW/NHM cited"]
-        LLM -.-> RULES
-        RULES --> SUM["Hindi summary"]
-        SAVE["/api/visits<br/>(alerts recomputed server-side)"] --> DB[("SQLite<br/>Docker volume")]
+    subgraph API["🐍 FastAPI + SQLite (one Docker container)"]
+        EX["/api/extract"] --> PARSER["Rule-based parser<br/>Hindi · Hinglish · English"]
+        EX -.->|only if GEMINI_API_KEY| LLM["Gemini (optional)<br/>validated, merged"]
+        PARSER --> RULES["Danger-sign rules<br/>rules.py · MoHFW/NHM cited"]
+        RULES --> SUM["Hindi + English read-back"]
+        SAVE["/api/visits<br/>alerts recomputed on the server"] --> DB[("SQLite<br/>Docker volume")]
         DB --> LISTS["Due tomorrow · High risk · History"]
-        SARVAM["/api/stt → Sarvam saarika"]
     end
 
-    WSA --> EX
-    REC --> SARVAM --> EX
+    STT --> EX
     SUM --> TTS --> CONF --> SAVE
+    CONF -. no network .-> Q -. back online .-> SAVE
 ```
 
 | Layer | Choice | Why |
 |---|---|---|
-| Speech-to-text | Browser **Web Speech API** (`hi-IN`) | Free, no key, handles Hindi and Hinglish well in Chrome |
-| Extraction | Own **rule-based parser** ([`backend/app/parser.py`](backend/app/parser.py), [`numbers.py`](backend/app/numbers.py)) | Deterministic, testable, works with no key, no per-call cost |
-| Clinical logic | [`backend/app/rules.py`](backend/app/rules.py) | Every threshold in one file, each with a citation |
-| Read-back | Browser `speechSynthesis` (`hi-IN`, or `en-IN` in EN mode) | Free, on-device |
-| Language | Own i18n layer ([`frontend/src/i18n.js`](frontend/src/i18n.js)): **हिं + EN** (default) · **हिं** · **EN** | Hindi-first for ASHAs, readable by anyone. Register fields and danger alerts keep an English line even in Hindi-only mode |
-| Backend | FastAPI + SQLite (stdlib `sqlite3`) | One container, one file DB, zero setup |
-| Frontend | React 18 + Vite, hand-written CSS | Fast, small bundle (~55 kB gzip), mobile-first |
+| Speech-to-text | Browser **Web Speech API** (`hi-IN`) | Free, no key, copes with Hindi and Hinglish in Chrome. Optional: Sarvam server STT with a key |
+| Extraction | Our **rule-based parser** ([`parser.py`](backend/app/parser.py), [`numbers.py`](backend/app/numbers.py)) | Deterministic, testable, no key, no per-call cost |
+| Clinical logic | [`rules.py`](backend/app/rules.py) | Every threshold in one file, each with a document + page citation |
+| Read-back | Browser `speechSynthesis` | Free, on the device |
+| Backend | FastAPI + SQLite (stdlib `sqlite3`) | One container, one file database, no setup |
+| Frontend | React 18 + Vite, hand-written CSS | Mobile-first, about 65 kB gzipped |
+
+## Safety design
+
+- **Read-back before save.** Nothing is saved until she hears the summary and says "हाँ" (or taps हाँ ✓).
+- **Never guesses.** A BP heard as `15 बाय 100`, reversed or half-heard becomes **"बीपी समझ नहीं आया — दोबारा बोलें / BP not clear — say again"**, shows what was heard, and is asked again. Unclear baby movement is asked again, never assumed normal. Two similar names become **"क्या आपका मतलब…? / Did you mean…?"**; an unknown name asks **"नई लाभार्थी जोड़ें? / Add as new woman?"**. A note with no visit details at all (e.g. "hello") is not turned into a visit.
+- **Cited rules.** Every threshold is a named constant with the source document and PDF page; every alert shows the reason and the source. See [Danger-sign rules](#danger-sign-rules-and-sources).
+- **Server decides.** Alerts are recomputed on the server when a visit is saved; the client's alerts are never trusted.
+- **Decision support only.** It refers to a 24-hour PHC or FRU; it does not diagnose.
+
+## Dependencies and fallback
+
+| Dependency | Cost | If it gets costly or stops working |
+|---|---|---|
+| Browser speech recognition (Chrome) | Free · needs internet | Type-in box, sample chips, and an offline save queue; a server-side STT (Sarvam with a key, or a self-hosted open model) can sit behind the existing `/api/stt` endpoint |
+| Our parser + danger rules | Free · our code | Runs fully on our server: no paid AI, no keys. Nothing to switch off |
+| Read-back (browser text-to-speech) | Free · on the device | The same summary is always on screen, with big हाँ / नहीं buttons |
+| Optional: Sarvam STT, Gemini extraction | Paid · off by default | On error, timeout or no key, it falls back to the built-in parser automatically; the visit still works |
+| Hosting: Render free tier (Docker) | Free | One `docker compose up` runs it on any Docker host |
+
+## Honest limits
+
+- **Speech recognition uses the browser and needs internet** (in Chrome it is Google's speech service). **Extraction and danger rules run on our server**, not on the phone, so extracting a visit also needs the network.
+- **Offline:** a confirmed visit is kept in an **offline save queue** on the phone and sent automatically when the network returns; words not yet extracted are kept as a draft. The app shell opens offline (service worker).
+- Covers the **ANC (pregnancy) home visit** only. Immunisation and newborn visits are next.
+- Tested with real Chrome speech output and scripted phone engines; field-tested only through our conversations, not yet in a pilot. Thresholds should be reviewed by the district medical officer before field use.
+- The free live demo forgets saved visits when it sleeps. Run it with Docker for persistent data (a Docker volume).
+
+## Tests and code quality
+
+- **284 backend tests (pytest) + 96 frontend tests (vitest)**, all run inside every Docker build, together with **ruff** (lint + format), **ESLint** and **Prettier**. Any warning or failing test fails the build.
+- **GitHub Actions CI** runs lint and all tests on every push, then runs `docker compose up` exactly as above and checks the app answers with no keys.
+- Highlights: 35 realistic spoken visit notes; the **exact Chrome hi-IN output** of a real recording (BP heard as `15 बाय 100`, कम heard as काम); every danger rule at its boundary values (139/89 vs 140/90, Hb 6.8 / 7.0 / 10.9 / 11.0, month 4 vs 5); the voice flow with pauses, corrections, refresh and offline saves; all three language modes.
+- Run them again on their own: `docker compose run --rm test` (backend) and `docker compose run --rm test-web` (frontend).
+- Runtime image: Python slim, non-root user, health check, no test tools; exact dependency pins; `npm audit` and `pip-audit` report no known vulnerabilities; no secrets in the repo or its history (gitleaks).
+
+## Roadmap
+
+From what the Mitanins asked for:
+
+- **Done:** saved visit history and the due-tomorrow list; an offline save queue; a Hindi-first, big-text UI with हाँ / नहीं buttons.
+- **Next:** check-up and medicine reminders.
+- **Next modules:** immunisation and newborn (HBNC) visits.
+- **Launch plan:** pilot with Mitanins in Gharghoda block → block PHC / ANM feedback → Raigarh district NHM → the Chhattisgarh state Mitanin programme.
 
 ## No-key mode vs key mode
 
-**What "no keys" really means:** no API keys needed; speech uses the browser's built-in recognition (**needs internet**); extraction and danger rules run fully on our server. Nothing in the core flow needs an account or a paid service.
+**"No keys"** means: no API keys needed; speech uses the browser's built-in recognition (**needs internet**); extraction and danger rules run fully on our server. Nothing in the core flow needs an account or a paid service.
 
 | | **No-key mode (default)** | **Key mode (optional)** |
 |---|---|---|
-| Speech-to-text | The browser's built-in recognition (Web Speech API, `hi-IN`). In Chrome this is Google's speech service, so it **needs internet** | `SARVAM_API_KEY` → Sarvam `saarika` server STT (also works in browsers without Web Speech, e.g. Firefox) |
-| Field extraction + danger rules | Our rule-based parser and `rules.py`, running on our server | `GEMINI_API_KEY` → Gemini JSON extraction. Each field is validated and merged with the parser, which fills any gaps. Rules are unchanged |
-| UI badge | `🔌 API की की ज़रूरत नहीं / No API keys needed`, with the full note in the footer | `🎙 Sarvam STT · ✨ Gemini + rules` |
+| Speech-to-text | The browser's built-in recognition (Web Speech API, `hi-IN`) | `SARVAM_API_KEY` → Sarvam `saarika` server STT (also works in browsers without Web Speech, e.g. Firefox) |
+| Field extraction + danger rules | Our rule-based parser and `rules.py`, on our server | `GEMINI_API_KEY` → Gemini JSON extraction; each field is validated and merged with the parser, which fills any gaps. Rules are unchanged |
+| UI badge | `🔌 API key की ज़रूरत नहीं / No API keys needed`, with the full note in the footer | `🎙 Sarvam STT · ✨ Gemini + rules` |
 | On API error / timeout / quota | — | Falls back to the built-in parser automatically. The UI shows a note; nothing crashes |
 
 To enable key mode, copy `.env.example` to `.env`, fill in the keys, and run `docker compose up` again. `.env` is git-ignored.
@@ -94,24 +149,15 @@ To enable key mode, copy `.env.example` to `.env`, fill in the keys, and run `do
 
 | Situation | What happens |
 |---|---|
-| **Network drops** | A confirmed visit is **saved on the phone** (an offline queue in localStorage) and sent automatically when the network returns. This is retried on reconnect and every 30 s, and a "⏳ N visits waiting to sync" badge shows the count. Words that could not be extracted yet are kept as a **draft** that survives a refresh and is re-sent when online. A service worker caches the app shell, so the app still **opens** with no network. Nothing confirmed is lost. |
-| **Browser without speech recognition** (Firefox, some iOS) | Shows *"इस ब्राउज़र में आवाज़ नहीं चलती - Chrome खोलें / Voice not supported here - use Chrome"*, opens the **type-in** box and keeps **▶ Try sample** available. Typed notes go through the same extraction, rules and Yes/No confirm. |
-| **Mic blocked / no mic** | Bilingual guidance (*"tap 🔒 in the address bar and allow the microphone"*) and the type-in box opens automatically. |
-| **Network error mid-speech** | Every word already heard is kept and extracted; the engine error never discards text. |
-| **A woman who isn't on the list** | Names are matched fuzzily across scripts and spellings (सुनिता = सुनीता, Sunitaa Sahoo = Sunita Sahu, Dhruv = Dhruw). The app never guesses: two close names become **"क्या आपका मतलब: …? / Did you mean …?"** chips, and an unknown name gives **"नई लाभार्थी जोड़ें? / Add as new woman?"** pre-filled with the spoken name. Adding the same name twice returns the existing woman. |
-| **Dialect and noisy speech** | Chhattisgarhi and Bhojpuri words: गोड़ फूल गइल (swollen feet), मूड़ पिरात / मुड़ी पीरा / माथा दुखत (headache), लहू / रकत गिरत (bleeding), जर / बोखार / ज्वर (fever), लइका हिलत नइ हे (baby not moving), and negations नइ / नइखे. Fillers (उम्म, मतलब, umm) are dropped and repeated fragments ("सात सात महीने", "BP 150 by 100 BP 150 by 100") collapse. |
-| **More date phrases** | आज, कल, परसों, **नरसों** (+3), *X* दिन / हफ्ते / **महीने** बाद, अगले हफ्ते / महीने, *X* तारीख, and weekdays in Hindi and English (सोमवार … इतवार / बृहस्पतिवार, somwar … itwar, Monday … Sunday). |
-
-## Dependencies and fallback plan if a paid API gets costly or stops
-
-| Dependency | Paid? | If it gets expensive or disappears |
-|---|---|---|
-| Web Speech API (Chrome) | Free | Switch to Sarvam (key), or self-host an open model such as AI4Bharat IndicConformer / Whisper behind the same `/api/stt` endpoint, which the UI already supports |
-| Sarvam STT | Paid, optional | Remove the key: the app reverts to browser STT with no code change |
-| Gemini | Paid, optional | Remove the key: the rule-based parser already handles the full flow and is covered by 200+ tests, including 35 realistic spoken sentences and real speech-to-text mishearings |
-| FastAPI, React, SQLite | Open source | — |
-
-No feature in the core flow depends on a paid API.
+| **Network drops** | A confirmed visit is **saved on the phone** (offline queue) and sent when the network returns (on reconnect and every 30 s); a "⏳ N visits waiting to sync" badge shows the count. Words not yet extracted are kept as a **draft** that survives a refresh. The app shell opens with no network. |
+| **Server waking up** (free hosting) | After 6 s the screen says the server is waking up; requests wait up to 75 s and retry once. |
+| **Browser without speech recognition** (Firefox, some iOS) | *"इस ब्राउज़र में आवाज़ नहीं चलती - Chrome खोलें / Voice not supported here - use Chrome"*; the **type-in** box opens and the **sample chips** stay available. Typed notes go through the same extraction, rules and Yes/No confirm. |
+| **Mic blocked / no mic** | When dictating: bilingual guidance (*"tap 🔒 in the address bar and allow the microphone"*) and the type-in box opens. When waiting for "हाँ": a short note, *"माइक नहीं मिला — ऊपर हाँ या नहीं दबाएँ / Mic not available — tap Yes or No above"*. |
+| **Nothing understood** | *"विज़िट की कोई जानकारी समझ नहीं आई… / No visit details found — say the name, month, BP and symptoms (or try a sample)"*. No fake woman, no empty read-back. |
+| **Pause, refresh, or a late answer** | A pending visit is never lost: a mic tap listens only for the answer and keeps every field; a refresh restores it; only a save or **＋ New visit** (asks first) clears it. |
+| **A woman who isn't on the list** | Names are matched across scripts and spellings (सुनिता = सुनीता, Sunitaa Sahoo = Sunita Sahu). Close names become "Did you mean…?" chips; an unknown name offers "Add as new woman?" with the spoken name. |
+| **Dialect and noisy speech** | Chhattisgarhi and Bhojpuri symptom words (गोड़ फूल गइल, मूड़ पिरात, लहू, जर, लइका हिलत नइ हे) and negations नइ / नइखे; fillers (उम्म, मतलब, umm) dropped; repeated fragments collapsed. |
+| **Bad or huge input** | Every API body is validated (types, ranges, known symptom codes, list sizes); bodies over 64 KB get a bilingual 413 before being read. All errors are bilingual and say what to do next; a crash-safe error boundary means the screen is never blank. |
 
 ## Danger-sign rules and sources
 
@@ -178,90 +224,46 @@ The referral level follows the 2010 ANC guideline's **Box 7**, which sorts each 
 ```bash
 git clone https://github.com/princejsps12-ux/asha-saathi.git
 cd asha-saathi
-docker compose up          # builds and starts; prints "ASHA Saathi is running → open http://localhost:8000"
+docker compose up          # builds (lint + all tests), starts, prints "open http://localhost:8000"
 ```
 
-Run the tests, inside Docker:
-
-```bash
-docker compose run --rm app pytest
-```
-
-Other useful commands:
-
-- Lint: `docker compose run --rm app ruff check .` (backend); the frontend's `npm run lint` runs inside every build
-
+- Tests again on their own: `docker compose run --rm test` (pytest) · `docker compose run --rm test-web` (vitest)
 - After pulling new code: `docker compose up --build`
-- Use another port: `PORT=9000 docker compose up`
-- Start fresh demo data: tap **↺ Reset demo data** in the app, or `docker compose down -v`
-- Local development without Docker: `cd backend && pip install -r requirements.txt && DB_PATH=./asha.db python -m app.serve`, plus `cd frontend && npm install && npm run dev` (Vite proxies `/api` to the backend)
+- Another port: `PORT=9000 docker compose up`
+- Fresh demo data: tap **↺ Reset demo data** in the app (it also clears the visit screen), or `docker compose down -v`
+- Without Docker: `cd backend && pip install -r requirements-dev.txt && DB_PATH=./asha.db python -m app.serve`, plus `cd frontend && npm ci && npm run dev` (Vite proxies `/api` to the backend)
 
 **Requirements:** Docker with Compose v2. No API keys, no Node or Python on the host.
-
-## Tests
-
-**263 pytest cases + 86 frontend (vitest) cases**, all run inside Docker. The pytest suite runs with `docker compose run --rm app pytest`. Every `docker compose build` also runs ESLint (`--max-warnings 0`), the vitest suite and `ruff check`; any lint warning or failing test fails the build:
-
-- `tests/test_hardening.py`: fuzzy names across scripts and spellings, never guessing between close names, the spoken name for "add as new", every new date phrase and weekday, Chhattisgarhi/Bhojpuri symptom words and negations, fillers and repeated fragments, the add-beneficiary API (no duplicates), and the honest no-key status note.
-- Frontend: `syncQueue.test.js` (offline queue: keep, send, stop while offline, never drop a rejected visit), `speech.test.js` (mobile engines, pauses), `api.test.js` (cold-start retry). `RecordView.hardening.test.jsx` covers an unsupported browser (message, type-in, Try sample), a blocked mic (guidance, type-in), a network drop mid-speech (text kept), an offline save (queued) and an offline extraction (draft survives a refresh), plus the add-new-woman and "did you mean" flows.
-- `tests/test_stt_mishearings.py`: the **exact Chrome hi-IN output** of a real spoken visit (`…बीपी 15 बाय 100 … बेबी मूवमेंट काम है…`) and other common mishearings: dropped zeros, reversed or half-heard BP, काम/कम, सूजन spellings, बाय/बाई/ओवर/upar-neeche, run-on sentences, no false "BP unclear" for dates, and the voice correction merge.
-- `tests/test_corpus.py`: **35 realistic visit notes** as ASHAs actually say them — Hindi, Hinglish, English, Hindi number words (`एक सौ दस बटा सत्तर`, `ek sau bees by assi`, `साढ़े सात महीने`), every BP format, weeks to months, weekdays, `तारीख`, `परसों`, negations. Symptoms are compared as exact sets, so a false alarm fails the test.
-- `tests/test_parser.py`: one block per parser rule. Hindi number words, Devanagari digits, every BP format, months/weeks, symptoms with negation, bleeding vs anaemia vs blood test, fetal movement, IFA, Td, every date phrase, Hb/temperature/weight, name matching, and full Hindi and Hinglish sentences.
-- `tests/test_rules.py`: every danger rule, including boundary values (139/89 vs 140/90, Hb 6.8/7.0/10.9/11.0, month 4 vs 5), alert ordering, and a check that every rule cites a source.
-- `tests/test_api.py`: the end-to-end pipeline, the bilingual output (English gloss, English read-back, Hindi + English alert reasons and actions), a fully English spoken visit, persistence, the due-tomorrow and high-risk lists, validation errors, alerts recomputed server-side, offline status, Sarvam with no key (503, no crash), and Gemini both timing out (falls back to the parser) and succeeding (validated merge).
-
-- `frontend/src/components/RecordView.test.jsx` renders the record screen with speech recognition scripted (including silences) and the API mocked. It covers:
-  - **a pause, then a mic tap:** all fields are kept and saved, with no re-dictation
-  - **a correction after a timeout:** "बीपी 150 बाय 100" fills the BP in the same visit
-  - **a refresh:** the pending visit is restored, then saved, and storage is cleared, including before the server's date has loaded
-  - the Yes/No buttons, the longer listening window plus one automatic retry, and **New visit** discarding only after confirmation
-
-  `confirmFlow.test.js` and `pendingVisit.test.js` unit-test the decisions behind this: what a mic tap means, retry on silence, answer and correction handling, and storage expiry, corrupt data and blocked storage.
-- `frontend/src/i18n.test.js`: the default is always bilingual (with nothing stored, and with junk stored), the three toggle options, localStorage save/reload (including blocked storage in private mode), what each mode shows (`linesFor`), Hindi/English key parity, matching placeholders, no Devanagari in English strings, and dates in both languages.
-
-## Error handling
-
-- Every error the UI can show is **bilingual and says what to do next**, for example *"सर्वर से कनेक्ट नहीं हो पाया… / Can't reach the server. Is the app running?"*. The UI never shows a raw status code or stack trace.
-- The API returns bilingual `detail` messages. Validation errors return a friendly message plus the field names. Unexpected errors are logged on the server and return a generic 500.
-- The microphone being blocked or missing, no speech heard, or no internet each get their own message. Without speech recognition, the app falls back to buttons and **Try sample**.
-- A missing or failing Sarvam or Gemini key falls back to the built-in parser automatically.
-- A React error boundary catches any rendering crash and shows a calm bilingual screen with a reload button. Saved data lives on the server, so nothing is lost.
 
 ## Project structure
 
 ```
 asha-saathi/
-├── docker-compose.yml      one service, one volume, no keys required
-├── Dockerfile              node build stage → python runtime serving API + static UI
-├── .env.example            optional keys (never commit .env)
-├── backend/              (ruff.toml: lint rules)
+├── docker-compose.yml        app (no keys needed) + optional test services
+├── Dockerfile                frontend build+tests → backend tests → slim non-root runtime
+├── .github/workflows/ci.yml  lint + all tests + docker compose smoke test on every push
+├── .env.example              optional keys (never commit .env)
+├── backend/                  FastAPI (ruff.toml, requirements.txt, requirements-dev.txt)
 │   ├── app/
-│   │   ├── numbers.py      Hindi/Hinglish number words → digits
-│   │   ├── parser.py       spoken note → VisitFields (no API key; fuzzy names, dialect words)
-│   │   ├── rules.py        ANC danger-sign rules + citations
-│   │   ├── summary.py      Hindi + English read-back and English gloss
-│   │   ├── integrations.py optional Sarvam STT / Gemini, with fallback
-│   │   ├── db.py           SQLite storage + list queries
-│   │   ├── seed.py         5 demo beneficiaries + sample sentences
-│   │   ├── main.py         FastAPI routes + bilingual error handling
-│   │   └── serve.py        entrypoint, prints the app URL
-│   └── tests/              263 pytest cases (parser, corpus, STT mishearings, hardening, rules, API)
-└── frontend/src/
-    ├── i18n.js             हिं + EN / हिं / EN modes, all UI strings, localStorage (+ i18n.test.js)
-    ├── lang.jsx            <Bi> two-line label and the language toggle
-    ├── confirmFlow.js      confirm step: mic-tap meaning, listen + auto-retry, yes/no/correction (+ test)
-    ├── pendingVisit.js     unsaved visit kept in localStorage across refreshes (+ test)
-    ├── speech.js           Web Speech recognition, Hindi/English TTS, recorder
-    ├── components/RecordView.jsx   mic → extract → read-back → confirm → save
-    ├── components/FieldsCard.jsx   tap-to-edit register fields
-    ├── components/AlertList.jsx    danger alerts with "why" + source
-    ├── components/Lists.jsx        beneficiaries, history, due, high-risk
-    └── components/Feedback.jsx     bilingual error notes + crash-safe error boundary
+│   │   ├── parser.py         spoken note → register fields (names, BP, dates, dialect, negation)
+│   │   ├── numbers.py        Hindi / Hinglish number words → digits
+│   │   ├── rules.py          ANC danger-sign rules, each with document + page
+│   │   ├── summary.py        Hindi + English read-back and English gloss
+│   │   ├── integrations.py   optional Sarvam STT / Gemini, with fallback
+│   │   ├── db.py · seed.py   SQLite storage, 5 demo women, the sample notes
+│   │   ├── main.py           API routes, validation, size limit, bilingual errors
+│   │   └── serve.py          entrypoint, prints the app URL
+│   └── tests/                284 pytest cases
+├── frontend/src/
+│   ├── components/RecordView.jsx   mic → extract → read back → confirm → save
+│   ├── confirmFlow.js · pendingVisit.js · syncQueue.js   answer handling, unsaved visit, offline queue
+│   ├── speech.js · dictation.js · spokenText.js          speech in / out, "बस" to finish, TTS spelling
+│   ├── i18n.js · lang.jsx    हिं + EN / हिं / EN, every UI string, <Bi> two-line labels
+│   └── *.test.js(x)          96 vitest cases
+├── deck/                     pitch deck (HTML → PDF) and the live-app screenshots
+└── JUDGE_REVIEW.md           cold-judge review of this repo and what was fixed
 ```
 
-## Limitations and next steps
+## License
 
-- Covers the ANC (pregnancy) visit only. Immunisation, HBNC newborn visits and family planning would follow the same parser-plus-rules pattern.
-- New beneficiaries come from the roster (seeded). Voice enrolment is the next feature.
-- Data stays in one local SQLite file. Syncing to HMIS/RCH portals would need government API access.
-- Speech recognition still needs internet. On-device recognition (e.g. a small Whisper/IndicConformer model in the browser) would make the voice path fully offline; typing and the offline save queue already work without network.
+[MIT](LICENSE) © 2026 Prince Pandey

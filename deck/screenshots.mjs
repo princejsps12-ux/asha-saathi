@@ -45,8 +45,6 @@ async function main() {
     console.log('saved', name)
   }
 
-  await shot('01-home')
-
   // Try sample (Hindi, danger signs) -> extraction, read-back, waiting for "हाँ"
   await page.click('.sample-chip') // first sample: Hindi, danger signs
   await page.waitForSelector('.confirm-bar', { timeout: 60000 })
@@ -56,7 +54,6 @@ async function main() {
   await page.evaluate(() => document.querySelector('.alerts').scrollIntoView({ block: 'start' }))
   await wait(300)
   await shot('03-alert', '.alerts')
-  await shot('04-fields', '.fields')
 
   // "हाँ" (Yes) -> saved
   await page.click('.btn-yes')

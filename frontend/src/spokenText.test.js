@@ -6,10 +6,12 @@ const EMERGENCY_HI = 'तुरंत 108 एम्बुलेंस बुल�
 const EMERGENCY_EN = 'Call 108 ambulance / refer to FRU now'
 const REFER_HI = 'आज ही 24 घंटे वाले PHC / मेडिकल ऑफिसर के पास रेफ़र करें'
 const REFER_EN = 'Refer to a 24-hour PHC / medical officer today'
-const READBACK_HI = 'गीता यादव। 8 महीने की गर्भवती। बीपी 150 बटा 112। खतरे का संकेत: बहुत ज़्यादा बीपी। '
-  + `${EMERGENCY_HI}। क्या यह सही है? हाँ या नहीं बोलिए।`
-const READBACK_EN = 'Geeta Yadav. 8 months pregnant. BP 150/112. Hb 9.5 g/dL. Temperature 101 °F. Taking IFA tablets. '
-  + `Td 2nd dose given. Danger sign: Severe high BP. ${EMERGENCY_EN}. Is this correct? Say yes or no.`
+const READBACK_HI =
+  'गीता यादव। 8 महीने की गर्भवती। बीपी 150 बटा 112। खतरे का संकेत: बहुत ज़्यादा बीपी। ' +
+  `${EMERGENCY_HI}। क्या यह सही है? हाँ या नहीं बोलिए।`
+const READBACK_EN =
+  'Geeta Yadav. 8 months pregnant. BP 150/112. Hb 9.5 g/dL. Temperature 101 °F. Taking IFA tablets. ' +
+  `Td 2nd dose given. Danger sign: Severe high BP. ${EMERGENCY_EN}. Is this correct? Say yes or no.`
 
 describe('read-back spells out abbreviations for text-to-speech', () => {
   it('Hindi: FRU becomes "एफ़-आर-यू यानी बड़े अस्पताल", never left for the voice to say "फ्लू"', () => {
@@ -28,8 +30,15 @@ describe('read-back spells out abbreviations for text-to-speech', () => {
   })
   it('a full English read-back spells out every abbreviation and unit', () => {
     const spoken = forSpeech(READBACK_EN, 'en')
-    for (const part of ['B-P 150 over 112', 'haemoglobin 9.5 grams per decilitre', '101 degrees Fahrenheit',
-      'I-F-A tablets', 'T-D 2nd dose', 'F-R-U, the first referral hospital']) expect(spoken).toContain(part)
+    for (const part of [
+      'B-P 150 over 112',
+      'haemoglobin 9.5 grams per decilitre',
+      '101 degrees Fahrenheit',
+      'I-F-A tablets',
+      'T-D 2nd dose',
+      'F-R-U, the first referral hospital',
+    ])
+      expect(spoken).toContain(part)
     expect(spoken).not.toMatch(/\b(FRU|PHC|IFA|Hb|Td|BP)\b/)
   })
   it('leaves ordinary words and numbers alone (no false matches inside words)', () => {

@@ -1,4 +1,5 @@
 """API tests: full pipeline, persistence, lists, and graceful key-less / API-failure behaviour."""
+
 from __future__ import annotations
 
 import httpx
@@ -77,6 +78,7 @@ def test_stt_without_key_is_503_not_crash(client):
 def test_gemini_failure_falls_back_to_parser(tmp_path, monkeypatch):
     def boom(*_a, **_k):
         raise httpx.ConnectTimeout("down")
+
     monkeypatch.setattr(integrations.httpx, "post", boom)
     client = TestClient(create_app(make_settings(tmp_path, gemini_api_key="fake")))
     res = client.post("/api/extract", json={"transcript": SAMPLES[1]["text"]}).json()
@@ -88,16 +90,20 @@ def test_gemini_success_merges_with_parser(tmp_path, monkeypatch):
     llm_json = '{"hb": 9.0, "weight_kg": 54, "symptoms": ["fever", "made_up"], "beneficiary_id": 77}'
 
     def fake_post(*_a, **_k):
-        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": llm_json}]}}]},
-                              request=httpx.Request("POST", "https://x"))
+        return httpx.Response(
+            200,
+            json={"candidates": [{"content": {"parts": [{"text": llm_json}]}}]},
+            request=httpx.Request("POST", "https://x"),
+        )
+
     monkeypatch.setattr(integrations.httpx, "post", fake_post)
     client = TestClient(create_app(make_settings(tmp_path, gemini_api_key="fake")))
     res = client.post("/api/extract", json={"transcript": SAMPLES[1]["text"]}).json()
     f = res["fields"]
     assert res["engine"] == "gemini+rules"
-    assert f["hb"] == 9.0 and f["weight_kg"] == 54   # LLM wins where present
-    assert f["symptoms"] == ["fever"]                 # unknown codes dropped
-    assert f["beneficiary_id"] == 1                   # unknown id ignored, parser match kept
+    assert f["hb"] == 9.0 and f["weight_kg"] == 54  # LLM wins where present
+    assert f["symptoms"] == ["fever"]  # unknown codes dropped
+    assert f["beneficiary_id"] == 1  # unknown id ignored, parser match kept
     assert f["ifa_taking"] is True and f["pregnancy_month"] == 7  # parser fills the gaps
 
 
@@ -129,8 +135,17 @@ def test_bilingual_analysis_english_gloss_and_readback(client):
     res = client.post("/api/extract", json={"transcript": SAMPLES[0]["text"]}).json()
     assert res["fields"]["beneficiary_name_en"] == "Rekha Verma"
     gloss = res["gloss_en"]
-    for part in ("Rekha Verma", "5 months pregnant", "BP 142/92", "swelling (feet)", "headache",
-                 "Taking IFA tablets", "Td 2nd dose given", "Next visit tomorrow", "Danger sign: High BP"):
+    for part in (
+        "Rekha Verma",
+        "5 months pregnant",
+        "BP 142/92",
+        "swelling (feet)",
+        "headache",
+        "Taking IFA tablets",
+        "Td 2nd dose given",
+        "Next visit tomorrow",
+        "Danger sign: High BP",
+    ):
         assert part in gloss
     assert "?" not in gloss  # gloss is a statement; the question is only in the read-back
     assert res["summary_en"].startswith(gloss) and res["summary_en"].endswith("Say yes or no.")
@@ -168,6 +183,7 @@ def test_unexpected_error_returns_friendly_500_not_a_stack_trace(tmp_path, monke
 
 def test_misheard_bp_is_asked_again_then_corrected_by_voice(client):
     from tests.test_stt_mishearings import REAL_STT
+
     first = client.post("/api/extract", json={"transcript": REAL_STT}).json()
     assert first["unclear"] == ["bp"] and first["fields"]["bp_heard"] == "15/100"
     assert first["fields"]["bp_systolic"] is None and first["fields"]["fetal_movement"] == "reduced"
@@ -188,13 +204,16 @@ def test_misheard_bp_is_asked_again_then_corrected_by_voice(client):
 
 
 def test_typed_bp_clears_unclear_flag(client):
-    res = client.post("/api/evaluate", json={"fields": {"bp_unclear": True, "bp_heard": "15/100",
-                                                         "bp_systolic": 150, "bp_diastolic": 100}}).json()
+    res = client.post(
+        "/api/evaluate",
+        json={"fields": {"bp_unclear": True, "bp_heard": "15/100", "bp_systolic": 150, "bp_diastolic": 100}},
+    ).json()
     assert res["fields"]["bp_unclear"] is False and res["unclear"] == []
 
 
 def test_phone_mixed_script_transcript_via_api(client):
     from tests.test_stt_mishearings import PHONE_STT
+
     res = client.post("/api/extract", json={"transcript": PHONE_STT})
     assert res.status_code == 200
     body = res.json()
@@ -208,7 +227,35 @@ def test_phone_mixed_script_transcript_via_api(client):
 
 def test_en_mode_stt_bp_via_api(client):
     from tests.test_stt_mishearings import EN_MODE_STT
+
     for text in (EN_MODE_STT, EN_MODE_STT.replace("150/100", "150‎/‎100")):
         res = client.post("/api/extract", json={"transcript": text}).json()
         assert (res["fields"]["bp_systolic"], res["fields"]["bp_diastolic"]) == (150, 100)
         assert res["unclear"] == [] and "BP not clear" not in res["summary_en"]
+
+
+# ------------------------------------------------------------------ input limits (judge review)
+
+
+def test_oversized_json_body_is_rejected_before_reading_it(client):
+    res = client.post(
+        "/api/extract",
+        content=b'{"transcript": "' + b"a" * 70_000 + b'"}',
+        headers={"content-type": "application/json"},
+    )
+    assert res.status_code == 413 and "Too long" in res.json()["detail"] and " / " in res.json()["detail"]
+
+
+def test_unknown_symptom_code_is_a_friendly_422(client):
+    res = client.post("/api/evaluate", json={"fields": {"symptoms": ["bleeding", "zzz"]}})
+    assert res.status_code == 422 and res.json()["fields"] == ["fields.symptoms"]
+
+
+def test_duplicate_symptoms_are_merged(client):
+    res = client.post("/api/evaluate", json={"fields": {"symptoms": ["fever", "fever"]}})
+    assert res.json()["fields"]["symptoms"] == ["fever"]
+
+
+def test_list_fields_are_capped(client):
+    res = client.post("/api/evaluate", json={"fields": {"beneficiary_suggestions": list(range(50))}})
+    assert res.status_code == 422

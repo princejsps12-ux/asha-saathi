@@ -1,10 +1,14 @@
 """Pydantic models shared by the parser, the rules engine and the API."""
+
 from __future__ import annotations
 
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+# At most this many "did you mean…?" names are offered for an unclear name.
+MAX_SUGGESTIONS = 10
 
 # Symptom codes the parser can emit -> (Hindi label, English label).
 SYMPTOM_LABELS: dict[str, tuple[str, str]] = {
@@ -25,11 +29,11 @@ class VisitFields(BaseModel):
     """Structured ANC home-visit register entry."""
 
     beneficiary_id: int | None = None
-    beneficiary_name: str | None = None
-    beneficiary_name_en: str | None = None
+    beneficiary_name: str | None = Field(None, max_length=80)
+    beneficiary_name_en: str | None = Field(None, max_length=80)
     # No confident match: the name as spoken (offer "add as new woman?") and close candidates.
     beneficiary_name_heard: str | None = Field(None, max_length=80)
-    beneficiary_suggestions: list[int] = Field(default_factory=list)
+    beneficiary_suggestions: list[int] = Field(default_factory=list, max_length=MAX_SUGGESTIONS)
     pregnancy_month: int | None = Field(None, ge=1, le=10)
     bp_systolic: int | None = Field(None, ge=50, le=260)
     bp_diastolic: int | None = Field(None, ge=30, le=180)
@@ -40,7 +44,7 @@ class VisitFields(BaseModel):
     hb: float | None = Field(None, ge=2, le=20, description="Haemoglobin g/dL")
     weight_kg: float | None = Field(None, ge=25, le=150)
     temperature_f: float | None = Field(None, ge=90, le=110)
-    symptoms: list[str] = Field(default_factory=list)
+    symptoms: list[str] = Field(default_factory=list, max_length=len(SYMPTOM_LABELS))
     # "unclear": movement was mentioned but neither reduced nor normal wording was heard.
     fetal_movement: Literal["normal", "reduced", "unclear"] | None = None
     ifa_taking: bool | None = None
@@ -48,6 +52,14 @@ class VisitFields(BaseModel):
     td_dose: int | None = Field(None, ge=1, le=3, description="1, 2 or 3 (=booster)")
     vaccine_given: bool | None = None
     next_visit_date: date | None = None
+
+    @field_validator("symptoms")
+    @classmethod
+    def known_symptoms(cls, codes: list[str]) -> list[str]:
+        unknown = [c for c in codes if c not in SYMPTOM_LABELS]
+        if unknown:
+            raise ValueError(f"unknown symptom code(s): {', '.join(unknown)}")
+        return list(dict.fromkeys(codes))  # no duplicates
 
 
 class Alert(BaseModel):
@@ -97,5 +109,6 @@ class IntentRequest(BaseModel):
 
 class BeneficiaryCreate(BaseModel):
     """A new woman added from the visit screen ("नई लाभार्थी जोड़ें?")."""
+
     name: str = Field(..., min_length=2, max_length=60)
     village: str = Field("", max_length=60)

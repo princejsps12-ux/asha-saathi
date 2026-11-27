@@ -1,13 +1,15 @@
 """FastAPI app: JSON API under /api, built React app served from /."""
+
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .config import Settings, get_settings
@@ -30,19 +32,24 @@ from .summary import build_gloss_en, build_summary, build_summary_en
 
 log = logging.getLogger("asha")
 # Honest description of the no-key mode, shown in the UI and logs.
-MODE_NOTE = ("No API keys needed; speech uses the browser's built-in recognition (needs internet); "
-             "extraction and danger rules run fully on our server.")
+MODE_NOTE = (
+    "No API keys needed; speech uses the browser's built-in recognition (needs internet); "
+    "extraction and danger rules run fully on our server."
+)
 MAX_AUDIO_BYTES = 10 * 1024 * 1024  # ~10 MB is several minutes of compressed speech
+MAX_JSON_BYTES = 64 * 1024  # a long spoken visit is ~1 KB; anything near this is not a real request
 
 # Every error the UI can see is bilingual ("Hindi / English") and says what to do next.
 MSG_NOT_FOUND = "लाभार्थी नहीं मिला / Beneficiary not found"
 MSG_INVALID = "कुछ जानकारी सही नहीं लगती, जाँचकर दोबारा डालें / Some values look wrong — please check them"
 MSG_INTERNAL = "कुछ गड़बड़ हुई, दोबारा कोशिश करें / Something went wrong — please try again"
 MSG_SELECT_FIRST = "पहले लाभार्थी चुनें / Select a beneficiary before saving"
-MSG_NO_SARVAM = ("ऑनलाइन आवाज़ सेवा चालू नहीं, ब्राउज़र आवाज़ पहचान इस्तेमाल करें / "
-                 "SARVAM_API_KEY not set — use browser speech recognition")
+MSG_NO_SARVAM = (
+    "ऑनलाइन आवाज़ सेवा चालू नहीं, ब्राउज़र आवाज़ पहचान इस्तेमाल करें / SARVAM_API_KEY not set — use browser speech recognition"
+)
 MSG_BAD_AUDIO = "रिकॉर्डिंग खाली या बहुत लंबी है / Audio missing or too large"
 MSG_STT_FAILED = "ऑनलाइन आवाज़ सेवा नहीं चली / Online speech service failed"
+MSG_TOO_LARGE = "बहुत लंबा है — छोटा करके दोबारा भेजें / Too long — please send a shorter note"
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -57,8 +64,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def get_db() -> Database:
         return app.state.db
 
-    def analyse(fields: VisitFields, engine: str = "rules", note: str | None = None,
-                changed: bool = True) -> Analysis:
+    def analyse(fields: VisitFields, engine: str = "rules", note: str | None = None, changed: bool = True) -> Analysis:
         if fields.bp_systolic and fields.bp_diastolic:  # a real reading (e.g. typed in) clears "unclear"
             fields.bp_unclear, fields.bp_heard = False, None
         if fields.beneficiary_id is not None:
@@ -72,11 +78,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         suggested = [_brief(p) for p in map(db.get_beneficiary, fields.beneficiary_suggestions) if p]
         alerts = evaluate(fields)
         today = settings.today()
-        return Analysis(fields=fields, alerts=alerts, risk=risk_level(alerts),
-                        summary_hi=build_summary(fields, alerts, today, suggested),
-                        summary_en=build_summary_en(fields, alerts, today, suggested),
-                        gloss_en=build_gloss_en(fields, alerts, today, suggested), engine=engine, engine_note=note,
-                        unclear=unclear_fields(fields), changed=changed, suggestions=suggested)
+        return Analysis(
+            fields=fields,
+            alerts=alerts,
+            risk=risk_level(alerts),
+            summary_hi=build_summary(fields, alerts, today, suggested),
+            summary_en=build_summary_en(fields, alerts, today, suggested),
+            gloss_en=build_gloss_en(fields, alerts, today, suggested),
+            engine=engine,
+            engine_note=note,
+            unclear=unclear_fields(fields),
+            changed=changed,
+            suggestions=suggested,
+        )
+
+    @app.middleware("http")
+    async def limit_body_size(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+        """Reject oversized JSON bodies before reading them (audio uploads have their own, larger limit)."""
+        length = request.headers.get("content-length", "")
+        if request.url.path != "/api/stt" and length.isdigit() and int(length) > MAX_JSON_BYTES:
+            return JSONResponse({"detail": MSG_TOO_LARGE}, status_code=413)
+        return await call_next(request)
 
     @app.exception_handler(Exception)
     async def unhandled(_: Request, exc: Exception) -> JSONResponse:  # never leak a stack trace to the UI
@@ -146,8 +168,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not data or len(data) > MAX_AUDIO_BYTES:
             raise HTTPException(413 if data else 400, MSG_BAD_AUDIO)
         try:
-            text = sarvam_transcribe(data, audio.filename or "visit.webm",
-                                     audio.content_type or "audio/webm", settings)
+            text = sarvam_transcribe(data, audio.filename or "visit.webm", audio.content_type or "audio/webm", settings)
         except IntegrationError as exc:
             raise HTTPException(502, f"{MSG_STT_FAILED} ({exc})") from exc
         return {"transcript": text}
@@ -158,8 +179,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if req.fields.beneficiary_id is None:
             raise HTTPException(422, MSG_SELECT_FIRST)
         result = analyse(req.fields)  # alerts recomputed server-side, never trusted from client
-        visit_id = store.add_visit(req.fields.beneficiary_id, settings.today(), req.transcript,
-                                   result.fields, result.alerts, result.risk)
+        visit_id = store.add_visit(
+            req.fields.beneficiary_id, settings.today(), req.transcript, result.fields, result.alerts, result.risk
+        )
         return {"visit": store.get_visit(visit_id), "analysis": result.model_dump(mode="json")}
 
     @app.post("/api/beneficiaries", status_code=201)

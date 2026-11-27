@@ -37,11 +37,17 @@ export async function request(path, options = {}, { retries = 1, timeoutMs = REQ
       })
     } catch {
       clearTimeout(timer)
-      if (attempt < retries) { await wait(RETRY_DELAY_MS); continue }
+      if (attempt < retries) {
+        await wait(RETRY_DELAY_MS)
+        continue
+      }
       throw new ApiError('err_unreachable')
     }
     clearTimeout(timer)
-    if (RETRYABLE_STATUS.has(res.status) && attempt < retries) { await wait(RETRY_DELAY_MS); continue }
+    if (RETRYABLE_STATUS.has(res.status) && attempt < retries) {
+      await wait(RETRY_DELAY_MS)
+      continue
+    }
     const data = await res.json().catch(() => ({}))
     if (!res.ok) throw new ApiError(keyForStatus(res.status), res.status, data.detail)
     return data

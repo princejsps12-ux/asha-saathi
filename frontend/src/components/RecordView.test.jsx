@@ -19,6 +19,7 @@ vi.mock('../speech.js', () => ({
   DICTATION_MAX_RESTARTS: 20,
   browserSttSupported: true,
   recorderSupported: false,
+  RECOGNITION_LANG: 'hi-IN',
   speechLang: (lang) => (lang === 'en' ? 'en-IN' : 'hi-IN'),
   speak: vi.fn(() => Promise.resolve()),
   stopSpeaking: vi.fn(),
@@ -30,17 +31,27 @@ vi.mock('../speech.js', () => ({
     const item = script.length ? script.shift() : ''
     const { shown, final, phrases, gapMs = 0 } = typeof item === 'string' ? { shown: item, final: item } : item
     let ended = false
-    const end = (value) => { if (!ended) { ended = true; opts.onEnd(value) } }
+    const end = (value) => {
+      if (!ended) {
+        ended = true
+        opts.onEnd(value)
+      }
+    }
     if (phrases) {
       let text = ''
-      phrases.forEach((phrase, i) => setTimeout(() => {
-        if (ended) return
-        vi.setSystemTime(Date.now() + gapMs) // the pause before this phrase
-        text = [text, phrase].filter(Boolean).join(' ')
-        opts.onText?.(text)
-      }, i))
+      phrases.forEach((phrase, i) =>
+        setTimeout(() => {
+          if (ended) return
+          vi.setSystemTime(Date.now() + gapMs) // the pause before this phrase
+          text = [text, phrase].filter(Boolean).join(' ')
+          opts.onText?.(text)
+        }, i),
+      )
     } else {
-      setTimeout(() => { if (shown) opts.onText?.(shown); end(final) }, 0)
+      setTimeout(() => {
+        if (shown) opts.onText?.(shown)
+        end(final)
+      }, 0)
     }
     return { stop: () => end('') }
   }),
@@ -53,15 +64,38 @@ vi.mock('../api.js', () => ({
 
 const DICTATION = 'सुनीता साहू 7 महीने बीपी 15 बाय 100 पैरों में सूजन है बेबी मूवमेंट काम है अगले हफ्ते फिर आऊंगी'
 const FIELDS = {
-  beneficiary_id: 1, beneficiary_name: 'सुनीता साहू', beneficiary_name_en: 'Sunita Sahu', pregnancy_month: 7,
-  bp_systolic: null, bp_diastolic: null, bp_unclear: true, bp_heard: '15/100', hb: null, weight_kg: null,
-  temperature_f: null, symptoms: ['swelling'], fetal_movement: 'reduced', ifa_taking: null, ifa_tablets: null,
-  td_dose: null, vaccine_given: null, next_visit_date: '2026-12-04',
+  beneficiary_id: 1,
+  beneficiary_name: 'सुनीता साहू',
+  beneficiary_name_en: 'Sunita Sahu',
+  pregnancy_month: 7,
+  bp_systolic: null,
+  bp_diastolic: null,
+  bp_unclear: true,
+  bp_heard: '15/100',
+  hb: null,
+  weight_kg: null,
+  temperature_f: null,
+  symptoms: ['swelling'],
+  fetal_movement: 'reduced',
+  ifa_taking: null,
+  ifa_tablets: null,
+  td_dose: null,
+  vaccine_given: null,
+  next_visit_date: '2026-12-04',
 }
 const FIXED = { ...FIELDS, bp_systolic: 150, bp_diastolic: 100, bp_unclear: false, bp_heard: null }
 const analysisOf = (fields, extra = {}) => ({
-  fields, alerts: [], risk: 'normal', summary_hi: 'सारांश', summary_en: 'Summary', gloss_en: 'Sunita Sahu. 7 months.',
-  engine: 'rules', engine_note: null, unclear: fields.bp_unclear ? ['bp'] : [], changed: true, ...extra,
+  fields,
+  alerts: [],
+  risk: 'normal',
+  summary_hi: 'सारांश',
+  summary_en: 'Summary',
+  gloss_en: 'Sunita Sahu. 7 months.',
+  engine: 'rules',
+  engine_note: null,
+  unclear: fields.bp_unclear ? ['bp'] : [],
+  changed: true,
+  ...extra,
 })
 const props = {
   status: { stt: 'browser', today: '2026-11-27' },
@@ -163,7 +197,7 @@ describe('pending visit survives a refresh', () => {
     await waitFor(() => expect(loadPending()).toBeNull())
   })
 
-  it('restores safely even before the server status (today\'s date) has loaded', async () => {
+  it("restores safely even before the server status (today's date) has loaded", async () => {
     const first = await dictateThenPause()
     first.unmount()
     render(<RecordView {...props} status={null} onSaved={vi.fn()} />) // first paint after a refresh
@@ -272,7 +306,8 @@ describe('bug: BP after "बीपी" must parse the same in every language mod
   const EN_MODE_STT = 'सुनीता साहू 7 महीने बीपी 150/100 पैरों में सूजन है बेबी मूवमेंट कम है अगले हफ्ते फिर आऊंगी'
   const PARSED = { ...FIELDS, bp_systolic: 150, bp_diastolic: 100, bp_unclear: false, bp_heard: null }
 
-  for (const [mode, sttLang] of [['both', 'hi-IN'], ['hi', 'hi-IN'], ['en', 'en-IN']]) {
+  // The voice flow is identical in every mode: recognition is always hi-IN; only the read-back voice changes.
+  for (const mode of ['both', 'hi', 'en']) {
     it(`${mode}: the exact transcript reaches extraction unchanged and BP shows 150/100`, async () => {
       api.extract.mockResolvedValueOnce(analysisOf(PARSED))
       script.push(EN_MODE_STT, '', '')
@@ -284,9 +319,11 @@ describe('bug: BP after "बीपी" must parse the same in every language mod
       fireEvent.click(mic())
       await waitFor(() => expect(api.extract).toHaveBeenCalled())
       expect(api.extract.mock.calls[0]).toEqual([EN_MODE_STT]) // the UI language never rewrites the text
-      expect(listen.mock.calls[0][0].lang).toBe(sttLang)
+      expect(listen.mock.calls[0][0].lang).toBe('hi-IN')
       await waitFor(() => expect(bpRowText()).toContain('150/100'))
       expect(bpRowText()).not.toMatch(/not clear|समझ नहीं/i)
+      await waitFor(() => expect(speak).toHaveBeenCalled())
+      expect(speak.mock.calls[0][1]).toBe(mode === 'en' ? 'en-IN' : 'hi-IN') // only the read-back voice changes
     })
   }
 })

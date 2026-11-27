@@ -1,9 +1,8 @@
-fastapi==0.115.6
-uvicorn==0.34.0
-pydantic==2.10.4
-httpx==0.28.1
-python-multipart==0.0.20
-tzdata==2024.2
-# tests
-pytest==8.3.4
-ruff==0.8.4
+# Runtime dependencies (exact pins). Test and lint tools are in requirements-dev.txt.
+fastapi==0.165.0
+starlette==1.10.0
+uvicorn==0.54.0
+pydantic==2.14.4
+httpx==0.29.0
+python-multipart==0.0.34
+tzdata==2026.6

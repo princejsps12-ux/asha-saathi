@@ -7,6 +7,7 @@ Needs no API key: plain Python running on our server. Design notes:
   are matched as substrings while Latin terms use word boundaries.
 * Symptoms are negation-aware per clause: "सूजन नहीं है" does not raise swelling.
 """
+
 from __future__ import annotations
 
 import difflib
@@ -30,6 +31,7 @@ class KnownBeneficiary:
 
 
 # --------------------------------------------------------------------------- helpers
+
 
 def _has_latin(term: str) -> bool:
     return bool(re.search(r"[a-z]", term))
@@ -59,8 +61,11 @@ def _pattern(*parts: str) -> re.Pattern[str]:
 
 
 # Includes dialect negations: Chhattisgarhi "नइ", Bhojpuri "नइखे" / "ना".
+# Hand-packed word lists: easier to scan than one word per line.
+# fmt: off
 NEGATIONS = ("नहीं", "नही", "मत", "नइ", "नइखे", "नइहे", "nahi", "nahin", "nhi", "nai", "naikhe", "no", "not", "never",
              "without")
+# fmt: on
 # Browser speech-to-text usually returns NO punctuation, so we also end a clause after a
 # sentence-final verb ("सूजन है | बेबी मूवमेंट कम है"); otherwise one "नहीं" would negate
 # every symptom in the whole visit note.
@@ -76,8 +81,11 @@ def split_clauses(text: str) -> list[str]:
 
 
 # Hesitation fillers carry no information and can split a phrase ("बीपी 150 उम्म बाय 100").
+# Hand-packed word lists: easier to scan than one word per line.
+# fmt: off
 FILLERS = frozenset({"अं", "अम्म", "उम", "उम्म", "हम्म", "मतलब", "यानी", "um", "umm", "uh", "uhh", "hmm", "hmmm",
                      "matlab", "yani", "yaani"})
+# fmt: on
 MAX_REPEAT_WORDS = 4  # "बीपी बीपी 150 बाय 100 150 बाय 100" -> collapse repeats of up to 4 words
 
 
@@ -88,9 +96,9 @@ def _drop_noise(words: list[str]) -> list[str]:
     for size in range(MAX_REPEAT_WORDS, 0, -1):
         i = 0
         while i + 2 * size <= len(words):
-            keys = [w.strip(".,!?।") for w in words[i:i + 2 * size]]
+            keys = [w.strip(".,!?।") for w in words[i : i + 2 * size]]
             if keys[:size] == keys[size:]:
-                del words[i + size:i + 2 * size]
+                del words[i + size : i + 2 * size]
             else:
                 i += 1
     return words
@@ -117,6 +125,8 @@ def _preprocess(text: str) -> str:
 
 
 # --------------------------------------------------------------------------- vocab
+# Hand-packed word lists: easier to scan than one word per line.
+# fmt: off
 
 SYMPTOM_PATTERNS: dict[str, re.Pattern[str]] = {
     # "sujan"/"soojan" (noun) and "sooj gaya"/"suje" (verb: became swollen)
@@ -221,12 +231,21 @@ YES_TERMS = ("हां", "हा", "हान", "जी", "सही", "ठी�
 NO_TERMS = ("नहीं", "नही", "ना", "नो", "गलत", "मत", "रद्द", "nahi", "nahin", "nhi", "na", "no", "galat", "mat",
             "cancel", "wrong")
 
+# fmt: on
 
 # --------------------------------------------------------------------------- field parsers
 
 # Plausibility ranges below are *input sanity checks* (reject "15 तारीख पर 2" as a BP),
 # not clinical thresholds — those live only in rules.py.
 SYSTOLIC_RANGE, DIASTOLIC_RANGE = (70, 260), (40, 160)
+PREGNANCY_MONTH_RANGE = (1, 10)
+PREGNANCY_WEEK_RANGE = (4, 42)
+WEEKS_PER_MONTH_X1000 = 4345  # ~4.345 weeks per month, as an integer ratio (week 28 -> month 7)
+LAST_PREGNANCY_MONTH = 9
+HB_RANGE = (3, 18)  # g/dL
+WEIGHT_RANGE_KG = (25, 150)
+TEMPERATURE_RANGE = (34, 108)  # °C or °F as spoken
+MAX_CELSIUS = 43  # a spoken temperature at or below this is in °C
 BP_WORD_REACH = 2  # words after "BP" (same clause) within which spoken numbers are taken as the BP
 
 _BP_WORD = r"(?:(?<![a-z])b\.?\s?p(?![a-z])|बीपी|बी पी|ब्लड प्रेशर|blood pressure|pressure|प्रेशर|रक्तचाप)"
@@ -250,8 +269,11 @@ class BpReading(NamedTuple):
 
 
 def _plausible(systolic: int, diastolic: int) -> bool:
-    return (SYSTOLIC_RANGE[0] <= systolic <= SYSTOLIC_RANGE[1] and DIASTOLIC_RANGE[0] <= diastolic <= DIASTOLIC_RANGE[1]
-            and systolic > diastolic)
+    return (
+        SYSTOLIC_RANGE[0] <= systolic <= SYSTOLIC_RANGE[1]
+        and DIASTOLIC_RANGE[0] <= diastolic <= DIASTOLIC_RANGE[1]
+        and systolic > diastolic
+    )
 
 
 def _right_after(text: str, word_end: int, start: int) -> bool:
@@ -264,7 +286,8 @@ def _right_after(text: str, word_end: int, start: int) -> bool:
 # Any short separator (or none) is accepted, because the keyword already says it is a BP.
 _BP_ANCHORED = re.compile(
     rf"{_BP_WORD}\s*(?:का|ka|है|hai|:|-|=)?\s*(\d{{2,3}})\s*(?:[^\w\s]{{1,3}}|{_BP_SEP}|{_UP})?\s*"
-    rf"(?:{_DOWN}\s*)?(\d{{2,3}})(?!\d)")
+    rf"(?:{_DOWN}\s*)?(\d{{2,3}})(?!\d)"
+)
 
 
 def parse_bp(text: str) -> BpReading:
@@ -292,18 +315,21 @@ def parse_bp(text: str) -> BpReading:
 
 def parse_pregnancy_month(text: str) -> int | None:
     # "(?:\.5)?" accepts "साढ़े सात महीने" (normalised to 7.5): month 7, not the "5".
-    m = re.search(rf"(?<![\d.])(\d{{1,2}})(?:\.5)?\s*(?:वां|वा|वें|th|st|nd|rd)?\s*{MONTH_WORDS}"
-                  rf"(?![a-z]*\s*{LATER_WORDS})", text)
-    if m and 1 <= int(m.group(1)) <= 10:
+    m = re.search(
+        rf"(?<![\d.])(\d{{1,2}})(?:\.5)?\s*(?:वां|वा|वें|th|st|nd|rd)?\s*{MONTH_WORDS}"
+        rf"(?![a-z]*\s*{LATER_WORDS})",
+        text,
+    )
+    if m and PREGNANCY_MONTH_RANGE[0] <= int(m.group(1)) <= PREGNANCY_MONTH_RANGE[1]:
         return int(m.group(1))
     ordinals = "|".join(sorted(map(re.escape, PREG_ORDINALS), key=len, reverse=True))
     m = re.search(rf"({ordinals})\s*{MONTH_WORDS}", text)
     if m:
         return PREG_ORDINALS[m.group(1)]
     m = re.search(rf"(?<!\d)(\d{{1,2}})\s*{WEEK_WORDS}(?![a-z]*\s*{LATER_WORDS})", text)
-    if m and 4 <= int(m.group(1)) <= 42:
-        # ~4.345 weeks per month; week 28 -> 7th month of pregnancy.
-        return min(9, -(-int(m.group(1)) * 1000 // 4345))
+    if m and PREGNANCY_WEEK_RANGE[0] <= int(m.group(1)) <= PREGNANCY_WEEK_RANGE[1]:
+        weeks = int(m.group(1))
+        return min(LAST_PREGNANCY_MONTH, -(-weeks * 1000 // WEEKS_PER_MONTH_X1000))  # rounded up
     return None
 
 
@@ -316,22 +342,24 @@ def _first_number(pattern: str, text: str, lo: float, hi: float) -> float | None
 
 
 def parse_hb(text: str) -> float | None:
-    return _first_number(r"(?:hb|h\s?b|एचबी|एच बी|हीमोग्लोबिन|हिमोग्लोबिन|ha?emoglobin)\D{0,12}?(\d{1,2}(?:\.\d)?)",
-                         text, 3, 18)
+    return _first_number(
+        r"(?:hb|h\s?b|एचबी|एच बी|हीमोग्लोबिन|हिमोग्लोबिन|ha?emoglobin)\D{0,12}?(\d{1,2}(?:\.\d)?)", text, *HB_RANGE
+    )
 
 
 def parse_weight(text: str) -> float | None:
-    value = _first_number(r"(?:वजन|weight|wajan|vajan|wazan)\D{0,10}?(\d{2,3}(?:\.\d)?)", text, 25, 150)
-    return value or _first_number(r"(\d{2,3}(?:\.\d)?)\s*(?:किलो|केजी|kg|kilo)", text, 25, 150)
+    value = _first_number(r"(?:वजन|weight|wajan|vajan|wazan)\D{0,10}?(\d{2,3}(?:\.\d)?)", text, *WEIGHT_RANGE_KG)
+    return value or _first_number(r"(\d{2,3}(?:\.\d)?)\s*(?:किलो|केजी|kg|kilo)", text, *WEIGHT_RANGE_KG)
 
 
 def parse_temperature(text: str) -> float | None:
     fever = r"(?:बुखार|तापमान|टेम्परेचर|bukh?aa?r|fever|temperature|temp)"
-    value = _first_number(rf"{fever}\D{{0,12}}?(\d{{2,3}}(?:\.\d)?)", text, 34, 108) or \
-        _first_number(rf"(\d{{2,3}}(?:\.\d)?)\s*(?:डिग्री|degree)?\s*(?:का\s*|ka\s*)?{fever}", text, 34, 108)
+    value = _first_number(rf"{fever}\D{{0,12}}?(\d{{2,3}}(?:\.\d)?)", text, *TEMPERATURE_RANGE) or _first_number(
+        rf"(\d{{2,3}}(?:\.\d)?)\s*(?:डिग्री|degree)?\s*(?:का\s*|ka\s*)?{fever}", text, *TEMPERATURE_RANGE
+    )
     if value is None:
         return None
-    return round(value * 9 / 5 + 32, 1) if value <= 43 else value  # Celsius -> Fahrenheit
+    return round(value * 9 / 5 + 32, 1) if value <= MAX_CELSIUS else value  # Celsius -> Fahrenheit
 
 
 def parse_symptoms(clauses: list[str]) -> list[str]:
@@ -392,8 +420,9 @@ def parse_td(clauses: list[str]) -> tuple[int | None, bool | None]:
 
 
 def _date_in(clause: str, today: date) -> date | None:
-    m = re.search(r"(\d{1,2})\s*(?:दिन|din|days?)\s*(?:बाद|baad|bad|में|me|later|after)", clause) or \
-        re.search(r"in\s*(\d{1,2})\s*days?", clause)
+    m = re.search(r"(\d{1,2})\s*(?:दिन|din|days?)\s*(?:बाद|baad|bad|में|me|later|after)", clause) or re.search(
+        r"in\s*(\d{1,2})\s*days?", clause
+    )
     if m:
         return today + timedelta(days=int(m.group(1)))
     m = re.search(rf"(\d{{1,2}})\s*{WEEK_WORDS}\s*(?:बाद|baad|bad|में|me|later|after)", clause)
@@ -405,8 +434,9 @@ def _date_in(clause: str, today: date) -> date | None:
     m = re.search(r"(\d{1,2})\s*(?:तारीख|tarikh|tareekh|tarik|date)", clause)
     if m and 1 <= int(m.group(1)) <= 31:
         day = int(m.group(1))
-        year, month = (today.year, today.month) if day > today.day else \
-            (today.year + today.month // 12, today.month % 12 + 1)
+        year, month = (
+            (today.year, today.month) if day > today.day else (today.year + today.month // 12, today.month % 12 + 1)
+        )
         for _ in range(3):  # skip months without that day (e.g. 31st)
             try:
                 return date(year, month, day)
@@ -438,27 +468,75 @@ def parse_next_visit(clauses: list[str], today: date) -> date | None:
                 return found
     # Unambiguous future phrases count even without the word "visit".
     for clause in clauses:
-        if _any(clause, ("अगले हफ्ते", "agle hafte", "next week", "परसों", "parso", "नरसों", "narso",
-                         "अगले महीने", "agle mahine")) or \
-                re.search(r"(?:दिन|din|days?|हफ्ते|hafte|weeks?|महीने|mahine|months?)\s*(?:बाद|baad|later)", clause):
+        if _any(
+            clause, ("अगले हफ्ते", "agle hafte", "next week", "परसों", "parso", "नरसों", "narso", "अगले महीने", "agle mahine")
+        ) or re.search(r"(?:दिन|din|days?|हफ्ते|hafte|weeks?|महीने|mahine|months?)\s*(?:बाद|baad|later)", clause):
             return _date_in(clause, today)
     return None
 
 
 # ---- beneficiary matching: exact, then fuzzy (small spelling / transliteration differences)
-CONFIDENT_FULL_NAME = 0.85   # similarity of the whole spoken name to a known name
-CONFIDENT_FIRST_NAME = 0.9   # similarity of a first name alone (needs a longer name, see below)
-MIN_FIRST_NAME_CHARS = 4     # "Anu" vs "Anju" is too short to trust on a first name alone
-SUGGEST_BELOW = 0.72         # below this a name is not even offered as "did you mean…?"
-AMBIGUITY_MARGIN = 0.05      # two women this close in score: ask which one, never pick
+CONFIDENT_FULL_NAME = 0.85  # similarity of the whole spoken name to a known name
+CONFIDENT_FIRST_NAME = 0.9  # similarity of a first name alone (needs a longer name, see below)
+MIN_FIRST_NAME_CHARS = 4  # "Anu" vs "Anju" is too short to trust on a first name alone
+SUGGEST_BELOW = 0.72  # below this a name is not even offered as "did you mean…?"
+AMBIGUITY_MARGIN = 0.05  # two women this close in score: ask which one, never pick
 
 _LONG_TO_SHORT = str.maketrans({"ी": "ि", "ू": "ु", "ा": "", "ं": "", "ँ": "", "्": ""})
-_ROMAN_SOUNDS = (("ee", "i"), ("oo", "u"), ("aa", "a"), ("w", "v"), ("z", "j"), ("ph", "f"), ("sh", "s"),
-                 ("q", "k"), ("y", "i"))
+_ROMAN_SOUNDS = (
+    ("ee", "i"),
+    ("oo", "u"),
+    ("aa", "a"),
+    ("w", "v"),
+    ("z", "j"),
+    ("ph", "f"),
+    ("sh", "s"),
+    ("q", "k"),
+    ("y", "i"),
+)
 _HONORIFICS = frozenset({"श्रीमती", "shrimati", "smt", "mrs", "बहन", "didi", "दीदी", "bai", "बाई"})
-_NAME_STOP = frozenset({"के", "का", "की", "को", "ने", "से", "घर", "ka", "ki", "ke", "ko", "ne", "se", "ghar",
-                        "आज", "aaj", "मैं", "main", "मैंने", "maine", "गई", "gayi", "gai", "visit", "विजिट", "bp",
-                        "बीपी", "pregnant", "गर्भवती", "हां", "haan", "नहीं", "nahi", "is", "the", "went", "to", "home"})
+_NAME_STOP = frozenset(
+    {
+        "के",
+        "का",
+        "की",
+        "को",
+        "ने",
+        "से",
+        "घर",
+        "ka",
+        "ki",
+        "ke",
+        "ko",
+        "ne",
+        "se",
+        "ghar",
+        "आज",
+        "aaj",
+        "मैं",
+        "main",
+        "मैंने",
+        "maine",
+        "गई",
+        "gayi",
+        "gai",
+        "visit",
+        "विजिट",
+        "bp",
+        "बीपी",
+        "pregnant",
+        "गर्भवती",
+        "हां",
+        "haan",
+        "नहीं",
+        "nahi",
+        "is",
+        "the",
+        "went",
+        "to",
+        "home",
+    }
+)
 
 
 def _skeleton(word: str) -> str:
@@ -469,7 +547,7 @@ def _skeleton(word: str) -> str:
     for a, b in _ROMAN_SOUNDS:
         w = w.replace(a, b)
     w = re.sub(r"([bcdfgjklmnpqrstvx])h", r"\1", w)  # aspirates: dh->d, kh->k, bh->b
-    return re.sub(r"(.)\1+", r"\1", w)            # doubled letters
+    return re.sub(r"(.)\1+", r"\1", w)  # doubled letters
 
 
 def _similar(a: str, b: str) -> float:
@@ -487,7 +565,7 @@ def _name_score(words: list[str], name: str) -> float:
         return 0.0
     best = 0.0
     for i in range(len(words)):
-        window = words[i:i + len(parts)]
+        window = words[i : i + len(parts)]
         if len(window) == len(parts) and _same_script(window[0], parts[0]):
             best = max(best, _similar(" ".join(window), " ".join(parts)))
         if len(parts[0]) >= MIN_FIRST_NAME_CHARS and _same_script(words[i], parts[0]):
@@ -501,7 +579,7 @@ def _name_score(words: list[str], name: str) -> float:
 class NameMatch:
     person: KnownBeneficiary | None
     suggestions: tuple[int, ...]  # close but not confident: "did you mean…?"
-    heard: str | None             # the spoken name when nobody matched confidently
+    heard: str | None  # the spoken name when nobody matched confidently
 
 
 def heard_name(raw_text: str) -> str | None:
@@ -551,6 +629,7 @@ def match_beneficiary(text: str, people: Iterable[KnownBeneficiary], raw_text: s
 
 # --------------------------------------------------------------------------- public API
 
+
 def parse_visit(text: str, today: date, people: Iterable[KnownBeneficiary] = ()) -> VisitFields:
     norm = _preprocess(text)
     clauses = split_clauses(norm)
@@ -584,16 +663,24 @@ def parse_visit(text: str, today: date, people: Iterable[KnownBeneficiary] = ())
 
 def unclear_fields(f: VisitFields) -> list[str]:
     """Fields that were spoken but not understood, so the read-back asks for them again."""
-    return [name for name, unclear in (("bp", f.bp_unclear), ("fetal_movement", f.fetal_movement == "unclear"))
-            if unclear]
+    return [
+        name for name, unclear in (("bp", f.bp_unclear), ("fetal_movement", f.fetal_movement == "unclear")) if unclear
+    ]
 
 
 def merge_correction(base: VisitFields, new: VisitFields) -> tuple[VisitFields, bool]:
     """Merge a spoken correction into an entry. Only what the correction actually says
     changes; symptoms are added; the matched woman is kept unless a new one is named."""
     merged, changed = base.model_dump(), False
-    skip = {"beneficiary_name", "beneficiary_name_en", "beneficiary_name_heard", "beneficiary_suggestions",
-            "bp_unclear", "bp_heard", "symptoms"}
+    skip = {
+        "beneficiary_name",
+        "beneficiary_name_en",
+        "beneficiary_name_heard",
+        "beneficiary_suggestions",
+        "bp_unclear",
+        "bp_heard",
+        "symptoms",
+    }
     for key, value in new.model_dump().items():
         if key in skip or value is None or value == merged[key]:
             continue

@@ -1,24 +1,44 @@
 // Fake speech engines that reproduce real mobile behaviour (Android Chrome, iOS Safari/Chrome).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  DICTATION_MAX_RESTARTS, DICTATION_SILENCE_MS, DICTATION_START_TIMEOUT_MS, END_SAFETY_MS, collectTranscript, listen, speak,
+  DICTATION_MAX_RESTARTS,
+  DICTATION_SILENCE_MS,
+  DICTATION_START_TIMEOUT_MS,
+  END_SAFETY_MS,
+  collectTranscript,
+  listen,
+  speak,
 } from './speech.js'
 
 const PHONE_TEXT = 'Sunita Sahu सात महीने BP 150 बाय 100 पैरों में सूजन है, बेबी मूवमेंट कम है, अगले हफ्ते फिर आऊंगी'
 /** onEnd must fire exactly once, with exactly this text. */
-const calledOnceWith = (fn, text) => { expect(fn).toHaveBeenCalledTimes(1); expect(fn).toHaveBeenCalledWith(text) }
+const calledOnceWith = (fn, text) => {
+  expect(fn).toHaveBeenCalledTimes(1)
+  expect(fn).toHaveBeenCalledWith(text)
+}
 const res = (transcript, isFinal) => Object.assign([{ transcript }], { isFinal })
 
 /** A SpeechRecognition stand-in the test drives by hand. */
 function fakeEngine() {
   const sessions = []
   class FakeRecognition {
-    constructor() { sessions.push(this); this.stopped = false }
+    constructor() {
+      sessions.push(this)
+      this.stopped = false
+    }
     start() {}
-    stop() { this.stopped = true }
-    say(...results) { this.onresult?.({ results }) }
-    end() { this.onend?.() }
-    error(code) { this.onerror?.({ error: code }) }
+    stop() {
+      this.stopped = true
+    }
+    say(...results) {
+      this.onresult?.({ results })
+    }
+    end() {
+      this.onend?.()
+    }
+    error(code) {
+      this.onerror?.({ error: code })
+    }
   }
   return { FakeRecognition, sessions, latest: () => sessions[sessions.length - 1] }
 }
@@ -35,8 +55,9 @@ describe('collectTranscript', () => {
     expect(collectTranscript(results)).toBe(PHONE_TEXT)
   })
   it('joins separate final pieces plus the trailing interim', () => {
-    expect(collectTranscript([res('Sunita Sahu', true), res('सात महीने', true), res('BP 150', false)]))
-      .toBe('Sunita Sahu सात महीने BP 150')
+    expect(collectTranscript([res('Sunita Sahu', true), res('सात महीने', true), res('BP 150', false)])).toBe(
+      'Sunita Sahu सात महीने BP 150',
+    )
   })
 })
 
@@ -101,10 +122,16 @@ describe('listen on mobile', () => {
 
 describe('speak waits until the phone has really stopped talking', () => {
   it('does not resolve while speechSynthesis is still speaking (Android may skip onend)', async () => {
-    globalThis.SpeechSynthesisUtterance = class { constructor(text) { this.text = text } }
+    globalThis.SpeechSynthesisUtterance = class {
+      constructor(text) {
+        this.text = text
+      }
+    }
     const synth = { speaking: true, cancel: vi.fn(), getVoices: () => [], speak: vi.fn() }
     let done = false
-    speak('पहला वाक्य।', 'hi-IN', synth).then(() => { done = true })
+    speak('पहला वाक्य।', 'hi-IN', synth).then(() => {
+      done = true
+    })
     vi.advanceTimersByTime(10000) // onend never fired; guard moved on, but audio still playing
     await Promise.resolve()
     expect(done).toBe(false)
@@ -116,8 +143,11 @@ describe('speak waits until the phone has really stopped talking', () => {
 
 describe('dictation tolerates thinking pauses (DICTATION_SILENCE_MS)', () => {
   const opts = (engine, onEnd) => ({
-    onEnd, RecognitionImpl: engine.FakeRecognition, silenceMs: DICTATION_SILENCE_MS,
-    startTimeoutMs: DICTATION_START_TIMEOUT_MS, maxRestarts: DICTATION_MAX_RESTARTS,
+    onEnd,
+    RecognitionImpl: engine.FakeRecognition,
+    silenceMs: DICTATION_SILENCE_MS,
+    startTimeoutMs: DICTATION_START_TIMEOUT_MS,
+    maxRestarts: DICTATION_MAX_RESTARTS,
   })
 
   it('a 3-second pause does not end the note; ~3.5 s of silence does', () => {
@@ -144,7 +174,7 @@ describe('dictation tolerates thinking pauses (DICTATION_SILENCE_MS)', () => {
     for (const w of words) {
       engine.latest().say(res(w, true))
       vi.advanceTimersByTime(1500) // short pause…
-      engine.latest().end()        // …and the phone ends the session on its own
+      engine.latest().end() // …and the phone ends the session on its own
     }
     expect(engine.sessions.length).toBe(words.length + 1) // restarted after every early end
     expect(onEnd).not.toHaveBeenCalled()

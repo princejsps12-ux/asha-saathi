@@ -9,13 +9,13 @@ describe('end commands: "बस" / "हो गया"', () => {
     expect(endCommandIn('हो गया।')).toBe('हो गया')
     expect(endCommandIn('ho gaya')).toBe('ho gaya')
     expect(endCommandIn('बस')).toBe('बस')
-    expect(endCommandIn(`${NOTE} बस`)).toBe('बस')            // at the end of a phrase
+    expect(endCommandIn(`${NOTE} बस`)).toBe('बस') // at the end of a phrase
     expect(endCommandIn(`${NOTE}, बस हो गया`)).toBe('बस हो गया')
     expect(endCommandIn('Done')).toBe('done')
   })
   it('does not fire on ordinary sentences that contain the same words', () => {
     expect(endCommandIn('टीडी का दूसरा टीका हो गया')).toBeNull() // "the vaccine is done"
-    expect(endCommandIn('बस से आई थी')).toBeNull()                // "came by bus"
+    expect(endCommandIn('बस से आई थी')).toBeNull() // "came by bus"
     expect(endCommandIn('sujan bas thodi si hai')).toBeNull()
     expect(endCommandIn('')).toBeNull()
   })
@@ -27,7 +27,15 @@ describe('end commands: "बस" / "हो गया"', () => {
 })
 
 describe('createEndDetector — "हो गया" counts only as its own phrase after a pause', () => {
-  const clock = () => { let t = 0; return { now: () => t, wait: (ms) => { t += ms } } }
+  const clock = () => {
+    let t = 0
+    return {
+      now: () => t,
+      wait: (ms) => {
+        t += ms
+      },
+    }
+  }
 
   it('"…आऊंगी" (pause) "हो गया" -> finish', () => {
     const c = clock()

@@ -1,0 +1,5 @@
+# Test and lint tools (used in the Docker test stage and CI; not in the runtime image).
+-r requirements.txt
+pytest==9.2.0
+ruff==0.17.6
+httpx2==2.16.2 # the HTTP client Starlette's TestClient uses

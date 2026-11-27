@@ -19,9 +19,7 @@ export function DateBi({ iso, today, inline = false }) {
   return <Bi hi={formatDate(iso, today, 'hi')} en={formatDate(iso, today, 'en')} inline={inline} />
 }
 
-const MonthBi = ({ month }) => (month
-  ? <Bi k="monthN" vars={{ n: month }} inline />
-  : <Bi k="monthUnknown" inline />)
+const MonthBi = ({ month }) => (month ? <Bi k="monthN" vars={{ n: month }} inline /> : <Bi k="monthUnknown" inline />)
 
 function PersonCard({ person, today, onOpen, showAlerts }) {
   return (
@@ -35,7 +33,9 @@ function PersonCard({ person, today, onOpen, showAlerts }) {
         </div>
         <div className="person-side">
           <RiskChip risk={person.risk} />
-          <span className="due">📅 <DateBi iso={person.next_visit_date} today={today} /></span>
+          <span className="due">
+            📅 <DateBi iso={person.next_visit_date} today={today} />
+          </span>
         </div>
       </button>
       {showAlerts && person.alerts.length > 0 && <AlertList alerts={person.alerts} compact />}
@@ -44,11 +44,23 @@ function PersonCard({ person, today, onOpen, showAlerts }) {
 }
 
 export function PeopleList({ people, today, onOpen, emptyKey, showAlerts = false }) {
-  if (!people) return <p className="muted center"><Bi k="loading" /></p>
-  if (!people.length) return emptyKey ? <p className="muted center"><Bi k={emptyKey} /></p> : null
+  if (!people)
+    return (
+      <p className="muted center">
+        <Bi k="loading" />
+      </p>
+    )
+  if (!people.length)
+    return emptyKey ? (
+      <p className="muted center">
+        <Bi k={emptyKey} />
+      </p>
+    ) : null
   return (
     <ul className="people">
-      {people.map((p) => <PersonCard key={p.id} person={p} today={today} onOpen={onOpen} showAlerts={showAlerts} />)}
+      {people.map((p) => (
+        <PersonCard key={p.id} person={p} today={today} onOpen={onOpen} showAlerts={showAlerts} />
+      ))}
     </ul>
   )
 }
@@ -56,17 +68,28 @@ export function PeopleList({ people, today, onOpen, emptyKey, showAlerts = false
 export function DueView({ version, today, onOpen }) {
   const [due, setDue] = useState(null)
   const [error, setError] = useState(null)
-  useEffect(() => { api.due().then(setDue).catch((e) => setError(toUiError(e))) }, [version])
+  useEffect(() => {
+    api
+      .due()
+      .then(setDue)
+      .catch((e) => setError(toUiError(e)))
+  }, [version])
   if (error) return <ErrorNote error={error} />
   return (
     <div className="stack">
-      <h2><Bi k="dueTomorrow" inline /> <span className="en">{due && <DateBi iso={due.tomorrow_date} inline />}</span></h2>
+      <h2>
+        <Bi k="dueTomorrow" inline /> <span className="en">{due && <DateBi iso={due.tomorrow_date} inline />}</span>
+      </h2>
       <PeopleList people={due?.tomorrow} today={today} onOpen={onOpen} emptyKey="nothingTomorrow" />
-      <h2><Bi k="dueToday" inline /></h2>
+      <h2>
+        <Bi k="dueToday" inline />
+      </h2>
       <PeopleList people={due?.today} today={today} onOpen={onOpen} emptyKey="nothingToday" />
       {due?.overdue?.length > 0 && (
         <>
-          <h2 className="overdue"><Bi k="overdue" inline /></h2>
+          <h2 className="overdue">
+            <Bi k="overdue" inline />
+          </h2>
           <PeopleList people={due.overdue} today={today} onOpen={onOpen} />
         </>
       )}
@@ -77,11 +100,21 @@ export function DueView({ version, today, onOpen }) {
 export function HighRiskView({ version, today, onOpen }) {
   const [people, setPeople] = useState(null)
   const [error, setError] = useState(null)
-  useEffect(() => { api.highRisk().then(setPeople).catch((e) => setError(toUiError(e))) }, [version])
+  useEffect(() => {
+    api
+      .highRisk()
+      .then(setPeople)
+      .catch((e) => setError(toUiError(e)))
+  }, [version])
   if (error) return <ErrorNote error={error} />
   return (
     <div className="stack">
-      <h2><Bi k="highRiskTitle" inline /> <span className="en">(<Bi k="highRiskSub" inline />)</span></h2>
+      <h2>
+        <Bi k="highRiskTitle" inline />{' '}
+        <span className="en">
+          (<Bi k="highRiskSub" inline />)
+        </span>
+      </h2>
       <PeopleList people={people} today={today} onOpen={onOpen} showAlerts emptyKey="noHighRisk" />
     </div>
   )
@@ -90,27 +123,55 @@ export function HighRiskView({ version, today, onOpen }) {
 export function PersonDetail({ id, today, version, onBack, onRecord }) {
   const [person, setPerson] = useState(null)
   const [error, setError] = useState(null)
-  useEffect(() => { api.beneficiary(id).then(setPerson).catch((e) => setError(toUiError(e))) }, [id, version])
+  useEffect(() => {
+    api
+      .beneficiary(id)
+      .then(setPerson)
+      .catch((e) => setError(toUiError(e)))
+  }, [id, version])
   if (error) return <ErrorNote error={error} />
-  if (!person) return <p className="muted center"><Bi k="loading" /></p>
+  if (!person)
+    return (
+      <p className="muted center">
+        <Bi k="loading" />
+      </p>
+    )
   return (
     <div className="stack">
-      <button type="button" className="btn btn-ghost back" onClick={onBack}><Bi k="back" /></button>
+      <button type="button" className="btn btn-ghost back" onClick={onBack}>
+        <Bi k="back" />
+      </button>
       <section className={`card profile risk-border-${person.risk}`}>
-        <h2><Bi hi={person.name_hi} en={person.name_en} /></h2>
-        <p>👨 <Bi k="husband" inline />: {person.husband_hi} · 🎂 <Bi k="years" vars={{ n: person.age }} inline /></p>
-        <p>📍 <Bi hi={person.village} en={person.village_en} inline /></p>
-        <p>🤰 <MonthBi month={person.pregnancy_month} /></p>
-        <p>📅 <Bi k="nextVisit" inline />: <DateBi iso={person.next_visit_date} today={today} inline /></p>
+        <h2>
+          <Bi hi={person.name_hi} en={person.name_en} />
+        </h2>
+        <p>
+          👨 <Bi k="husband" inline />: {person.husband_hi} · 🎂 <Bi k="years" vars={{ n: person.age }} inline />
+        </p>
+        <p>
+          📍 <Bi hi={person.village} en={person.village_en} inline />
+        </p>
+        <p>
+          🤰 <MonthBi month={person.pregnancy_month} />
+        </p>
+        <p>
+          📅 <Bi k="nextVisit" inline />: <DateBi iso={person.next_visit_date} today={today} inline />
+        </p>
         <RiskChip risk={person.risk} />
-        <button type="button" className="btn btn-primary" onClick={() => onRecord(person.id)}><Bi k="recordFor" /></button>
+        <button type="button" className="btn btn-primary" onClick={() => onRecord(person.id)}>
+          <Bi k="recordFor" />
+        </button>
       </section>
-      <h2><Bi k="history" inline /> <span className="en">({person.visits.length})</span></h2>
+      <h2>
+        <Bi k="history" inline /> <span className="en">({person.visits.length})</span>
+      </h2>
       <ol className="timeline">
         {person.visits.map((v) => (
           <li key={v.id} className={`visit risk-border-${v.risk}`}>
             <div className="visit-head">
-              <strong><DateBi iso={v.visit_date} today={today} /></strong>
+              <strong>
+                <DateBi iso={v.visit_date} today={today} />
+              </strong>
               <RiskChip risk={v.risk} />
             </div>
             <VisitFacts f={v.fields} />
@@ -134,5 +195,11 @@ function VisitFacts({ f }) {
     f.td_dose && `💉 Td-${f.td_dose === 3 ? 'B' : f.td_dose}`,
     f.next_visit_date && `📅 → ${f.next_visit_date.slice(8)}/${f.next_visit_date.slice(5, 7)}`,
   ].filter(Boolean)
-  return <div className="facts">{facts.map((x) => <span key={x}>{x}</span>)}</div>
+  return (
+    <div className="facts">
+      {facts.map((x) => (
+        <span key={x}>{x}</span>
+      ))}
+    </div>
+  )
 }

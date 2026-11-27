@@ -25,6 +25,7 @@ PIH, …) but give no numeric cut-offs.
 These rules support, not replace, clinical judgement. Thresholds should be reviewed
 by the district's medical officer before field deployment.
 """
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -97,8 +98,10 @@ def anaemia_cutoff(month: int | None) -> float:
 
 def _severe_htn(f: VisitFields) -> Why | None:
     if (f.bp_diastolic or 0) > BP_SEVERE_DIASTOLIC_ABOVE:
-        return (f"BP {_bp(f)} mmHg: diastolic above {BP_SEVERE_DIASTOLIC_ABOVE} (imminent eclampsia)",
-                f"बीपी {_bp(f)} — नीचे वाला {BP_SEVERE_DIASTOLIC_ABOVE} से ज़्यादा (एक्लेम्पसिया का खतरा)")
+        return (
+            f"BP {_bp(f)} mmHg: diastolic above {BP_SEVERE_DIASTOLIC_ABOVE} (imminent eclampsia)",
+            f"बीपी {_bp(f)} — नीचे वाला {BP_SEVERE_DIASTOLIC_ABOVE} से ज़्यादा (एक्लेम्पसिया का खतरा)",
+        )
     return None
 
 
@@ -113,8 +116,7 @@ def _htn(f: VisitFields) -> Why | None:
 
 def _preeclampsia(f: VisitFields) -> Why | None:
     if _has(f, "swelling", "swelling_face_hands") and _has(f, "headache", "blurred_vision"):
-        return ("Swelling + headache/blurred vision together (pre-eclampsia warning)",
-                "सूजन के साथ सिर दर्द / धुंधला दिखना")
+        return ("Swelling + headache/blurred vision together (pre-eclampsia warning)", "सूजन के साथ सिर दर्द / धुंधला दिखना")
     return None
 
 
@@ -149,8 +151,10 @@ def _fetal_movement(f: VisitFields) -> Why | None:
         return None
     month_en = f"month {f.pregnancy_month}" if f.pregnancy_month else "month not recorded"
     month_hi = f"{f.pregnancy_month}वाँ महीना" if f.pregnancy_month else "महीना दर्ज नहीं"
-    return (f"Baby movement reduced/absent ({month_en}, expected from month {FETAL_MOVEMENT_FROM_MONTH})",
-            f"बच्चे की हलचल कम / नहीं ({month_hi}; {FETAL_MOVEMENT_FROM_MONTH}वें महीने से हलचल होनी चाहिए)")
+    return (
+        f"Baby movement reduced/absent ({month_en}, expected from month {FETAL_MOVEMENT_FROM_MONTH})",
+        f"बच्चे की हलचल कम / नहीं ({month_hi}; {FETAL_MOVEMENT_FROM_MONTH}वें महीने से हलचल होनी चाहिए)",
+    )
 
 
 def _severe_anaemia(f: VisitFields) -> Why | None:
@@ -161,8 +165,7 @@ def _severe_anaemia(f: VisitFields) -> Why | None:
 
 def _breathlessness(f: VisitFields) -> Why | None:
     if _has(f, "breathlessness"):
-        return ("Breathlessness reported (possible severe anaemia)",
-                "सांस फूलना (गंभीर खून की कमी का संकेत हो सकता है)")
+        return ("Breathlessness reported (possible severe anaemia)", "सांस फूलना (गंभीर खून की कमी का संकेत हो सकता है)")
     return None
 
 
@@ -170,11 +173,12 @@ def _anaemia(f: VisitFields) -> Why | None:
     cutoff = anaemia_cutoff(f.pregnancy_month)
     if f.hb is not None and HB_SEVERE_ANAEMIA <= f.hb < cutoff:
         trimester = "2nd trimester" if cutoff == HB_ANAEMIA_SECOND_TRIMESTER else "1st/3rd trimester"
-        return (f"Hb {f.hb} g/dL < {cutoff} ({trimester} cut-off)",
-                f"हीमोग्लोबिन {f.hb} — {cutoff} से कम")
+        return (f"Hb {f.hb} g/dL < {cutoff} ({trimester} cut-off)", f"हीमोग्लोबिन {f.hb} — {cutoff} से कम")
     if f.hb is None and _has(f, "pallor_weakness"):
-        return ("Weakness/pallor reported, Hb not measured — get Hb test",
-                "कमज़ोरी / पीलापन, हीमोग्लोबिन जाँच नहीं हुई — जाँच कराएँ")
+        return (
+            "Weakness/pallor reported, Hb not measured — get Hb test",
+            "कमज़ोरी / पीलापन, हीमोग्लोबिन जाँच नहीं हुई — जाँच कराएँ",
+        )
     return None
 
 
@@ -188,8 +192,10 @@ def _abdominal_pain(f: VisitFields) -> Why | None:
 
 def _high_fever(f: VisitFields) -> Why | None:
     if f.temperature_f is not None and f.temperature_f > FEVER_ABOVE_F:
-        return (f"Temperature {f.temperature_f} °F > {FEVER_ABOVE_F} °F (38 °C)",
-                f"तापमान {f.temperature_f} °F — {FEVER_ABOVE_F} °F (38 °C) से ज़्यादा")
+        return (
+            f"Temperature {f.temperature_f} °F > {FEVER_ABOVE_F} °F (38 °C)",
+            f"तापमान {f.temperature_f} °F — {FEVER_ABOVE_F} °F (38 °C) से ज़्यादा",
+        )
     return None
 
 
@@ -201,8 +207,10 @@ def _fever_reported(f: VisitFields) -> Why | None:
 
 def _no_ifa(f: VisitFields) -> Why | None:
     if f.ifa_taking is False and (f.pregnancy_month or IFA_START_MONTH) >= IFA_START_MONTH:
-        return (f"Not taking IFA tablets ({IFA_TABLETS} tablets advised from month {IFA_START_MONTH})",
-                f"आयरन की गोली नहीं ले रही ({IFA_START_MONTH}वें महीने से {IFA_TABLETS} गोली ज़रूरी)")
+        return (
+            f"Not taking IFA tablets ({IFA_TABLETS} tablets advised from month {IFA_START_MONTH})",
+            f"आयरन की गोली नहीं ले रही ({IFA_START_MONTH}वें महीने से {IFA_TABLETS} गोली ज़रूरी)",
+        )
     return None
 
 
@@ -210,8 +218,10 @@ def _bp_unclear(f: VisitFields) -> Why | None:
     # Never guess a BP from a mis-heard number: ask for it again.
     if f.bp_unclear:
         heard = f" '{f.bp_heard}'" if f.bp_heard else ""
-        return (f"BP heard as{heard} — not a valid reading; re-measure or say it again",
-                f"बीपी{heard} सुना — यह सही रीडिंग नहीं; दोबारा नापें या बोलें")
+        return (
+            f"BP heard as{heard} — not a valid reading; re-measure or say it again",
+            f"बीपी{heard} सुना — यह सही रीडिंग नहीं; दोबारा नापें या बोलें",
+        )
     return None
 
 
@@ -220,8 +230,7 @@ def _fetal_movement_unclear(f: VisitFields) -> Why | None:
         return None
     if f.pregnancy_month is not None and f.pregnancy_month < FETAL_MOVEMENT_FROM_MONTH:
         return None
-    return ("Baby movement mentioned but unclear — ask: reduced or normal?",
-            "बच्चे की हलचल साफ़ नहीं — पूछें: कम है या ठीक?")
+    return ("Baby movement mentioned but unclear — ask: reduced or normal?", "बच्चे की हलचल साफ़ नहीं — पूछें: कम है या ठीक?")
 
 
 def _swelling_only(f: VisitFields) -> Why | None:
@@ -238,27 +247,65 @@ def _headache_only(f: VisitFields) -> Why | None:
 
 RULES: tuple[Rule, ...] = (
     # --- [SBA] Box 7 "Visit FRU" column -> EMERGENCY
-    Rule("severe_hypertension", "red", "बहुत ज़्यादा बीपी", "Severe high BP (imminent eclampsia)", EMERGENCY,
-         "[SBA] p.31; [CHO] p.22, p.29", _severe_htn),
-    Rule("convulsions", "red", "दौरे / झटके", "Convulsions", EMERGENCY,
-         "[SBA] p.42 Box 7; [MCP] p.4", _convulsions),
-    Rule("bleeding", "red", "खून आना", "Bleeding in pregnancy", EMERGENCY,
-         "[SBA] p.42 Box 7; [MCP] p.4", _bleeding),
-    Rule("headache_blurred_vision", "red", "सिर दर्द और धुंधला दिखना", "Headache with blurred vision", EMERGENCY,
-         "[SBA] p.42 Box 7; [MCP] p.4", _headache_vision),
-    Rule("reduced_fetal_movement", "red", "बच्चे की हलचल कम", "Reduced fetal movement", EMERGENCY,
-         "[SBA] p.36, p.42 Box 7", _fetal_movement),
-    Rule("severe_anaemia", "red", "गंभीर खून की कमी", "Severe anaemia", EMERGENCY,
-         "[SBA] p.42 Box 7; [AMB] p.56, p.62", _severe_anaemia),
+    Rule(
+        "severe_hypertension",
+        "red",
+        "बहुत ज़्यादा बीपी",
+        "Severe high BP (imminent eclampsia)",
+        EMERGENCY,
+        "[SBA] p.31; [CHO] p.22, p.29",
+        _severe_htn,
+    ),
+    Rule("convulsions", "red", "दौरे / झटके", "Convulsions", EMERGENCY, "[SBA] p.42 Box 7; [MCP] p.4", _convulsions),
+    Rule("bleeding", "red", "खून आना", "Bleeding in pregnancy", EMERGENCY, "[SBA] p.42 Box 7; [MCP] p.4", _bleeding),
+    Rule(
+        "headache_blurred_vision",
+        "red",
+        "सिर दर्द और धुंधला दिखना",
+        "Headache with blurred vision",
+        EMERGENCY,
+        "[SBA] p.42 Box 7; [MCP] p.4",
+        _headache_vision,
+    ),
+    Rule(
+        "reduced_fetal_movement",
+        "red",
+        "बच्चे की हलचल कम",
+        "Reduced fetal movement",
+        EMERGENCY,
+        "[SBA] p.36, p.42 Box 7",
+        _fetal_movement,
+    ),
+    Rule(
+        "severe_anaemia",
+        "red",
+        "गंभीर खून की कमी",
+        "Severe anaemia",
+        EMERGENCY,
+        "[SBA] p.42 Box 7; [AMB] p.56, p.62",
+        _severe_anaemia,
+    ),
     # --- refer today: [SBA] Box 7 "Visit 24-hour PHC" column, or "refer immediately" in the text
-    Rule("hypertension", "red", "हाई बीपी", "High BP in pregnancy", REFER,
-         "[SBA] p.31, p.42 Box 7; [CHO] p.45", _htn),
-    Rule("preeclampsia_signs", "red", "प्री-एक्लेम्पसिया के लक्षण", "Pre-eclampsia warning signs", REFER,
-         "[SBA] p.43 Box 7; [MCP] p.4", _preeclampsia),
-    Rule("face_hand_swelling", "red", "चेहरे/हाथों पर सूजन", "Swelling of face/hands", REFER,
-         "[SBA] p.31 (oedema)", _face_swelling),
-    Rule("breathlessness", "red", "सांस फूलना", "Breathlessness", REFER,
-         "[SBA] p.42 Box 7; [MCP] p.4", _breathlessness),
+    Rule("hypertension", "red", "हाई बीपी", "High BP in pregnancy", REFER, "[SBA] p.31, p.42 Box 7; [CHO] p.45", _htn),
+    Rule(
+        "preeclampsia_signs",
+        "red",
+        "प्री-एक्लेम्पसिया के लक्षण",
+        "Pre-eclampsia warning signs",
+        REFER,
+        "[SBA] p.43 Box 7; [MCP] p.4",
+        _preeclampsia,
+    ),
+    Rule(
+        "face_hand_swelling",
+        "red",
+        "चेहरे/हाथों पर सूजन",
+        "Swelling of face/hands",
+        REFER,
+        "[SBA] p.31 (oedema)",
+        _face_swelling,
+    ),
+    Rule("breathlessness", "red", "सांस फूलना", "Breathlessness", REFER, "[SBA] p.42 Box 7; [MCP] p.4", _breathlessness),
     Rule("abdominal_pain", "red", "पेट में दर्द", "Abdominal pain", REFER, "[SBA] p.43 Box 7", _abdominal_pain),
     Rule("high_fever", "red", "तेज़ बुखार", "High fever", REFER, "[SBA] p.43 Box 7; [MCP] p.4", _high_fever),
     # --- watch / follow up
@@ -268,10 +315,24 @@ RULES: tuple[Rule, ...] = (
     Rule("headache", "amber", "सिर दर्द", "Headache", WATCH, "[SBA] p.31 (measure BP)", _headache_only),
     Rule("no_ifa", "amber", "आयरन की गोली नहीं ले रही", "Not taking IFA", WATCH, "[AMB] p.50", _no_ifa),
     # --- spoken but not understood: ask again
-    Rule("bp_unclear", "amber", "बीपी साफ़ नहीं सुना", "BP not clear", ASK_AGAIN,
-         "[SBA] p.31 (measure BP at every visit)", _bp_unclear),
-    Rule("fetal_movement_unclear", "amber", "हलचल साफ़ नहीं", "Baby movement unclear", ASK_AGAIN,
-         "[SBA] p.36", _fetal_movement_unclear),
+    Rule(
+        "bp_unclear",
+        "amber",
+        "बीपी साफ़ नहीं सुना",
+        "BP not clear",
+        ASK_AGAIN,
+        "[SBA] p.31 (measure BP at every visit)",
+        _bp_unclear,
+    ),
+    Rule(
+        "fetal_movement_unclear",
+        "amber",
+        "हलचल साफ़ नहीं",
+        "Baby movement unclear",
+        ASK_AGAIN,
+        "[SBA] p.36",
+        _fetal_movement_unclear,
+    ),
 )
 
 
@@ -281,9 +342,19 @@ def evaluate(fields: VisitFields) -> list[Alert]:
     for rule in RULES:
         why = rule.check(fields)
         if why:
-            alerts.append(Alert(code=rule.code, severity=rule.severity, title_hi=rule.title_hi,
-                                title_en=rule.title_en, reason=why[0], reason_hi=why[1],
-                                action_hi=rule.action[0], action_en=rule.action[1], source=rule.source))
+            alerts.append(
+                Alert(
+                    code=rule.code,
+                    severity=rule.severity,
+                    title_hi=rule.title_hi,
+                    title_en=rule.title_en,
+                    reason=why[0],
+                    reason_hi=why[1],
+                    action_hi=rule.action[0],
+                    action_en=rule.action[1],
+                    source=rule.source,
+                )
+            )
     return sorted(alerts, key=lambda a: a.severity != "red")
 
 

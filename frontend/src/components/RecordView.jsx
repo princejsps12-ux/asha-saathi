@@ -7,10 +7,20 @@ import { Bi, useI18n } from '../lang.jsx'
 import { createEndDetector, stripEndCommand } from '../dictation.js'
 import { clearDraft, clearPending, loadDraft, loadPending, saveDraft, savePending } from '../pendingVisit.js'
 import { enqueueVisit } from '../syncQueue.js'
+import { hasVisitDetails } from '../visitFields.js'
 import { forSpeech } from '../spokenText.js'
 import {
-  DICTATION_MAX_RESTARTS, DICTATION_SILENCE_MS, DICTATION_START_TIMEOUT_MS, browserSttSupported, listen, recordAudio,
-  recorderSupported, speak, speechLang, stopSpeaking,
+  DICTATION_MAX_RESTARTS,
+  DICTATION_SILENCE_MS,
+  DICTATION_START_TIMEOUT_MS,
+  RECOGNITION_LANG,
+  browserSttSupported,
+  listen,
+  recordAudio,
+  recorderSupported,
+  speak,
+  speechLang,
+  stopSpeaking,
 } from '../speech.js'
 import AlertList from './AlertList.jsx'
 import { ErrorNote } from './Feedback.jsx'
@@ -27,8 +37,18 @@ import NewWomanCard from './NewWomanCard.jsx'
 const PENDING_PHASES = new Set(['speaking', 'confirming', 'review', 'saving'])
 const MAX_ECHO_RELISTENS = 1
 const SLOW_SERVER_MS = 6000 // after this, say the server is waking up (free tier cold start)
+const MIC_UNAVAILABLE = new Set(['not-allowed', 'service-not-allowed', 'audio-capture'])
 
-export default function RecordView({ status, people, symptomLabels, samples, preset, onSaved, onQueued, onPeopleChanged }) {
+export default function RecordView({
+  status,
+  people,
+  symptomLabels,
+  samples,
+  preset,
+  onSaved,
+  onQueued,
+  onPeopleChanged,
+}) {
   const { lang, t, plain, pick } = useI18n()
   const [restored] = useState(loadPending) // read once, on first render
   const [draft] = useState(() => (restored ? '' : loadDraft())) // un-extracted words from an offline moment
@@ -54,12 +74,15 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   const useServerStt = status?.stt === 'sarvam' && recorderSupported
   const canListen = browserSttSupported || useServerStt
   const pending = Boolean(analysis) && PENDING_PHASES.has(phase)
-  const voice = speechLang(lang)
-  const say = (text) => speak(forSpeech(text, lang), voice) // abbreviations spelled out for TTS only
-  const speechError = (code) => (translate('en', `err_${code}`) === `err_${code}`
-    ? { k: 'err_other', vars: { code } } : { k: `err_${code}` })
+  const readBackVoice = speechLang(lang)
+  const say = (text) => speak(forSpeech(text, lang), readBackVoice) // abbreviations spelled out for TTS only
+  const speechError = (code) =>
+    translate('en', `err_${code}`) === `err_${code}` ? { k: 'err_other', vars: { code } } : { k: `err_${code}` }
 
-  const setTranscript = (text) => { transcriptRef.current = text; setTranscriptState(text) }
+  const setTranscript = (text) => {
+    transcriptRef.current = text
+    setTranscriptState(text)
+  }
   const newFlow = () => {
     flow.current += 1
     handle.current?.stop?.()
@@ -70,9 +93,16 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     return flow.current
   }
 
-  useEffect(() => { presetRef.current = preset }, [preset])
+  useEffect(() => {
+    presetRef.current = preset
+  }, [preset])
   // Stop any listening / speech when the screen unmounts.
-  useEffect(() => () => { newFlow() }, [])
+  useEffect(
+    () => () => {
+      newFlow()
+    },
+    [],
+  )
 
   // Keep the pending visit in localStorage; clear it once saved or discarded.
   useEffect(() => {
@@ -83,16 +113,26 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   // A sleeping free-tier server can take ~50 s to wake: say so instead of looking frozen.
   const waitingForServer = phase === 'thinking' || phase === 'saving'
   useEffect(() => {
-    if (!waitingForServer) { setSlow(false); return undefined }
+    if (!waitingForServer) return undefined
     const timer = setTimeout(() => setSlow(true), SLOW_SERVER_MS)
-    return () => clearTimeout(timer)
+    return () => {
+      clearTimeout(timer)
+      setSlow(false)
+    }
   }, [waitingForServer])
 
   /** Start fresh. Called after a save, or by the "New visit" button (asks before discarding). */
   const newVisit = () => {
     newFlow()
-    setPhase('idle'); setTranscript(''); setAnalysis(null); setError(null); setNotice(null); setHeardAnswer('')
-    setSavedOffline(false); setHideNewWoman(false); clearDraft()
+    setPhase('idle')
+    setTranscript('')
+    setAnalysis(null)
+    setError(null)
+    setNotice(null)
+    setHeardAnswer('')
+    setSavedOffline(false)
+    setHideNewWoman(false)
+    clearDraft()
   }
 
   /** The only way to throw away an unsaved visit: an explicit tap, confirmed. */
@@ -126,21 +166,15 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     onFieldsChange({ ...analysis.fields, beneficiary_id: person.id })
   }
 
-  // Back online: re-send words that couldn't be extracted while offline.
-  useEffect(() => {
-    const retryDraft = () => {
-      if (loadDraft() && !analysis && phase === 'idle') retryExtraction()
-    }
-    window.addEventListener('online', retryDraft)
-    return () => window.removeEventListener('online', retryDraft)
-  })
-
   async function process(text) {
     const id = flow.current
     if (!text.trim()) {
-      setError(speechError('no-speech')); setPhase('idle'); return
+      setError(speechError('no-speech'))
+      setPhase('idle')
+      return
     }
-    setPhase('thinking'); setError(null)
+    setPhase('thinking')
+    setError(null)
     try {
       let result = await api.extract(text)
       if (result.fields.beneficiary_id == null && presetRef.current) {
@@ -148,13 +182,20 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
       }
       if (id !== flow.current) return
       clearDraft()
+      if (!hasVisitDetails(result.fields)) {
+        // e.g. "hello": say what to say, never invent a woman
+        setError({ k: 'nothingFound' })
+        setPhase('idle')
+        return
+      }
       setAnalysis(result)
       await readBackAndConfirm(result)
     } catch (e) {
       if (id !== flow.current) return
       const offline = e?.key === 'err_unreachable'
       if (offline) saveDraft(text) // keep her words on the phone; retried when the network returns
-      setError(offline ? { k: 'offlineDraft' } : toUiError(e)); setPhase('idle')
+      setError(offline ? { k: 'offlineDraft' } : toUiError(e))
+      setPhase('idle')
     }
   }
 
@@ -167,27 +208,34 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   }
 
   /** One listening window for the answer (resolves '' on silence / error). */
-  const listenOnce = (id) => new Promise((resolve) => {
-    if (id !== flow.current) return resolve('')
-    setHeardAnswer('')
-    handle.current = listen({
-      lang: voice,
-      startTimeoutMs: CONFIRM_LISTEN.startTimeoutMs,
-      silenceMs: CONFIRM_LISTEN.silenceMs,
-      onText: (text) => id === flow.current && setHeardAnswer(text),
-      onError: (code) => {
-        if (id === flow.current && code !== 'no-speech') setError(speechError(code))
-      },
-      onEnd: resolve,
+  const listenOnce = (id) =>
+    new Promise((resolve) => {
+      if (id !== flow.current) return resolve('')
+      setHeardAnswer('')
+      handle.current = listen({
+        lang: RECOGNITION_LANG,
+        startTimeoutMs: CONFIRM_LISTEN.startTimeoutMs,
+        silenceMs: CONFIRM_LISTEN.silenceMs,
+        onText: (text) => id === flow.current && setHeardAnswer(text),
+        onError: (code) => {
+          if (id !== flow.current || code === 'no-speech') return
+          // The Yes / No buttons are on screen, so a blocked or missing mic is a short note, not a failure.
+          if (MIC_UNAVAILABLE.has(code)) setNotice('confirmNoMic')
+          else setError(speechError(code))
+        },
+        onEnd: resolve,
+      })
     })
-  })
 
   /** Listen for yes / no / a correction (with one automatic retry) and act on it. */
   async function listenAndResolve(result, id) {
-    if (!browserSttSupported) { setPhase('review'); return } // buttons are the fallback
+    if (!browserSttSupported) {
+      setPhase('review')
+      return
+    } // buttons are the fallback
     setPhase('confirming')
     let outcome
-    let answer = ''
+    let answer
     for (let echoes = 0; ; echoes++) {
       answer = await listenForAnswer(() => listenOnce(id), { onRetry: () => setRetrying(true) })
       if (id !== flow.current) return
@@ -221,7 +269,8 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
 
   /** Mic tap while a visit is pending: listen for the answer only, keep every field. */
   function answerByVoice() {
-    setNotice(null); setError(null)
+    setNotice(null)
+    setError(null)
     listenAndResolve(analysis, newFlow())
   }
 
@@ -234,30 +283,39 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
   async function save(result = analysis) {
     newFlow()
     if (result?.fields.beneficiary_id == null) {
-      setError({ k: 'selectFirst' }); setPhase('review')
+      setError({ k: 'selectFirst' })
+      setPhase('review')
       say(t('selectFirst'))
       return
     }
-    setPhase('saving'); setError(null); setNotice(null)
+    setPhase('saving')
+    setError(null)
+    setNotice(null)
     try {
       const { analysis: saved } = await api.saveVisit(transcriptRef.current, result.fields)
-      setAnalysis(saved); setPhase('saved')
+      setAnalysis(saved)
+      setPhase('saved')
       onSaved?.()
       const red = saved.alerts.filter((a) => a.severity === 'red')
-      say(red.length
-        ? t('saySavedDanger', {
-          titles: red.map((a) => pick(a.title_hi, a.title_en)).join(', '),
-          action: pick(red[0].action_hi, red[0].action_en),
-        })
-        : t('saySaved'))
+      say(
+        red.length
+          ? t('saySavedDanger', {
+              titles: red.map((a) => pick(a.title_hi, a.title_en)).join(', '),
+              action: pick(red[0].action_hi, red[0].action_en),
+            })
+          : t('saySaved'),
+      )
     } catch (e) {
-      if (e?.key === 'err_unreachable') { // no network: keep the confirmed visit on the phone
+      if (e?.key === 'err_unreachable') {
+        // no network: keep the confirmed visit on the phone
         onQueued?.(enqueueVisit({ transcript: transcriptRef.current, fields: result.fields }))
-        setSavedOffline(true); setPhase('saved')
+        setSavedOffline(true)
+        setPhase('saved')
         say(t('saySavedOffline'))
         return
       }
-      setError(toUiError(e)); setPhase('review') // still pending: nothing is lost
+      setError(toUiError(e))
+      setPhase('review') // still pending: nothing is lost
     }
   }
 
@@ -271,7 +329,7 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     setPhase('listening')
     setDictating(true)
     const dictation = listen({
-      lang: voice,
+      lang: RECOGNITION_LANG,
       // Real ASHAs pause to think: only ~3.5 s of silence ends the note; mobile engines that
       // stop at each pause are restarted and the text is appended.
       silenceMs: DICTATION_SILENCE_MS,
@@ -298,7 +356,10 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
         // Never lose words that were already on screen (some mobile engines end with no final result).
         const heard = stripEndCommand(text || transcriptRef.current, endCommand)
         setTranscript(heard)
-        if (!heard.trim() && engineError) { setPhase('idle'); return } // keep the mic / network guidance
+        if (!heard.trim() && engineError) {
+          setPhase('idle')
+          return
+        } // keep the mic / network guidance
         if (heard.trim()) setError(null) // an engine error after speech doesn't matter: we have text
         process(heard)
       },
@@ -319,6 +380,15 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     process(transcriptRef.current)
   }
 
+  // Back online: re-send words that couldn't be extracted while offline.
+  useEffect(() => {
+    const retryDraft = () => {
+      if (loadDraft() && !analysis && phase === 'idle') retryExtraction()
+    }
+    window.addEventListener('online', retryDraft)
+    return () => window.removeEventListener('online', retryDraft)
+  })
+
   async function startServerStt() {
     const id = flow.current
     try {
@@ -331,14 +401,17 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
           setPhase('thinking')
           try {
             const { transcript: text } = await api.stt(blob)
-            setTranscript(text); process(text)
+            setTranscript(text)
+            process(text)
           } catch (e) {
-            setError(toUiError(e)); setPhase('idle')
+            setError(toUiError(e))
+            setPhase('idle')
           }
         },
       }
     } catch {
-      setError(speechError('not-allowed')); setPhase('idle')
+      setError(speechError('not-allowed'))
+      setPhase('idle')
     }
   }
 
@@ -369,53 +442,90 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
     newFlow()
     if (phase === 'confirming' || phase === 'speaking') setPhase('review')
     try {
-      setAnalysis(await api.evaluate(fields)); setError(null)
+      setAnalysis(await api.evaluate(fields))
+      setError(null)
     } catch (e) {
       setError(toUiError(e))
     }
   }
 
   const busy = ['thinking', 'saving'].includes(phase)
-  const canRetryExtraction = Boolean(error) && !analysis && Boolean(transcript.trim()) && phase === 'idle'
-  const phaseKey = phase === 'confirming'
-    ? (retrying ? 'phase_listenAgain' : analysis?.unclear?.length ? 'phase_clarify' : 'phase_confirming')
-    : busy && slow ? 'phase_waking' : `phase_${phase}`
+  const canRetryExtraction =
+    Boolean(error) && error.k !== 'nothingFound' && !analysis && Boolean(transcript.trim()) && phase === 'idle'
+  const phaseKey =
+    phase === 'confirming'
+      ? retrying
+        ? 'phase_listenAgain'
+        : analysis?.unclear?.length
+          ? 'phase_clarify'
+          : 'phase_confirming'
+      : busy && slow
+        ? 'phase_waking'
+        : `phase_${phase}`
   const micLabel = phase === 'listening' || phase === 'confirming' ? 'micStop' : pending ? 'micAnswer' : 'micStart'
 
   return (
     <div className="record">
       <div className="mic-zone">
-        <button type="button" className={`mic mic-${phase}`} onClick={micPressed}
-          disabled={!canListen || busy} aria-label={plain(micLabel)}>
+        <button
+          type="button"
+          className={`mic mic-${phase}`}
+          onClick={micPressed}
+          disabled={!canListen || busy}
+          aria-label={plain(micLabel)}
+        >
           <svg viewBox="0 0 24 24" aria-hidden>
-            {phase === 'listening' || phase === 'confirming'
-              ? <rect x="7" y="7" width="10" height="10" rx="2" />
-              : <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z" />}
+            {phase === 'listening' || phase === 'confirming' ? (
+              <rect x="7" y="7" width="10" height="10" rx="2" />
+            ) : (
+              <path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12h-2Z" />
+            )}
           </svg>
         </button>
         {phase === 'listening' && dictating ? (
           <div className="listening" role="status" aria-live="polite">
             <span className="listening-dot" aria-hidden />
             <Bi k="phase_listening" className="phase" />
-            <small className="phase-sub"><Bi k="listeningHint" /></small>
-            <button type="button" className="btn btn-done" onClick={finishDictation}><Bi k="doneButton" /></button>
+            <small className="phase-sub">
+              <Bi k="listeningHint" />
+            </small>
+            <button type="button" className="btn btn-done" onClick={finishDictation}>
+              <Bi k="doneButton" />
+            </button>
           </div>
-        ) : <Bi k={phaseKey} className="phase" />}
-        {phase === 'review' && pending && <small className="phase-sub"><Bi k="reviewSub" /></small>}
+        ) : (
+          <Bi k={phaseKey} className="phase" />
+        )}
+        {phase === 'review' && pending && (
+          <small className="phase-sub">
+            <Bi k="reviewSub" />
+          </small>
+        )}
         {phase === 'confirming' && heardAnswer && <p className="heard">“{heardAnswer}”</p>}
         {!canListen && (
           <div className="warn" role="alert">
-            <strong><Bi k="noStt" always /></strong>
-            <small><Bi k="noSttHelp" always /></small>
+            <strong>
+              <Bi k="noStt" always />
+            </strong>
+            <small>
+              <Bi k="noSttHelp" always />
+            </small>
           </div>
         )}
         {!pending && samples.length > 0 && (
           <section className="samples" aria-label="नमूना चलाएँ / Try sample">
-            <h3 className="samples-title"><Bi k="trySample" inline /></h3>
+            <h3 className="samples-title">
+              <Bi k="trySample" inline />
+            </h3>
             <div className="sample-chips">
               {samples.map((sample) => (
-                <button key={sample.id} type="button" className="sample-chip" onClick={() => trySample(sample)}
-                  disabled={busy || phase === 'listening'}>
+                <button
+                  key={sample.id}
+                  type="button"
+                  className="sample-chip"
+                  onClick={() => trySample(sample)}
+                  disabled={busy || phase === 'listening'}
+                >
                   <Bi hi={sample.label_hi} en={sample.label_en} />
                 </button>
               ))}
@@ -435,23 +545,43 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
         </div>
       )}
 
-      {notice && <p className="notice" role="status"><Bi k={notice} always /></p>}
+      {notice && (
+        <p className="notice" role="status">
+          <Bi k={notice} always />
+        </p>
+      )}
 
       {phase === 'idle' && !analysis && !transcript && (
         <section className="card intro" aria-label="How it works">
-          <h3><Bi k="introTitle" /></h3>
+          <h3>
+            <Bi k="introTitle" />
+          </h3>
           <ol className="intro-steps">
-            <li><span aria-hidden>🎤</span><Bi k="introStep1" /></li>
-            <li><span aria-hidden>📋</span><Bi k="introStep2" /></li>
-            <li><span aria-hidden>🚨</span><Bi k="introStep3" /></li>
+            <li>
+              <span aria-hidden>🎤</span>
+              <Bi k="introStep1" />
+            </li>
+            <li>
+              <span aria-hidden>📋</span>
+              <Bi k="introStep2" />
+            </li>
+            <li>
+              <span aria-hidden>🚨</span>
+              <Bi k="introStep3" />
+            </li>
           </ol>
         </section>
       )}
 
       {(transcript || phase === 'listening') && (
         <section className="card transcript">
-          <h3><Bi k="transcriptTitle" inline /></h3>
-          <p>{transcript || <span className="muted">…</span>}{phase === 'listening' && <span className="caret" />}</p>
+          <h3>
+            <Bi k="transcriptTitle" inline />
+          </h3>
+          <p>
+            {transcript || <span className="muted">…</span>}
+            {phase === 'listening' && <span className="caret" />}
+          </p>
           {analysis?.gloss_en && (
             <div className="gloss" lang="en">
               <h4>{t('glossTitle')}</h4>
@@ -463,18 +593,35 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
 
       <ErrorNote error={error} />
       {canRetryExtraction && (
-        <button type="button" className="btn btn-primary" onClick={retryExtraction}><Bi k="retryExtract" /></button>
+        <button type="button" className="btn btn-primary" onClick={retryExtraction}>
+          <Bi k="retryExtract" />
+        </button>
       )}
 
       {!pending && phase !== 'listening' && (
         <section className="type-in">
           {!typeOpen && canListen ? (
-            <button type="button" className="link" onClick={() => setTypeOpen(true)}><Bi k="typeToggle" /></button>
+            <button type="button" className="link" onClick={() => setTypeOpen(true)}>
+              <Bi k="typeToggle" />
+            </button>
           ) : (
-            <form className="card" onSubmit={(e) => { e.preventDefault(); submitTyped() }}>
-              <h3><Bi k="typeToggle" inline /></h3>
-              <textarea rows={3} value={typed} onChange={(e) => setTyped(e.target.value)}
-                placeholder={plain('typePlaceholder')} aria-label={plain('typeToggle')} />
+            <form
+              className="card"
+              onSubmit={(e) => {
+                e.preventDefault()
+                submitTyped()
+              }}
+            >
+              <h3>
+                <Bi k="typeToggle" inline />
+              </h3>
+              <textarea
+                rows={3}
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+                placeholder={plain('typePlaceholder')}
+                aria-label={plain('typeToggle')}
+              />
               <button type="submit" className="btn btn-primary" disabled={!typed.trim() || busy}>
                 <Bi k="typeSubmit" />
               </button>
@@ -484,14 +631,21 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
       )}
 
       {analysis && phase !== 'saved' && analysis.fields.beneficiary_id == null && !hideNewWoman && (
-        <NewWomanCard key={analysis.fields.beneficiary_name_heard || 'none'} fields={analysis.fields}
-          suggestions={analysis.suggestions} onPick={pickWoman} onAdded={womanAdded} />
+        <NewWomanCard
+          key={analysis.fields.beneficiary_name_heard || 'none'}
+          fields={analysis.fields}
+          suggestions={analysis.suggestions}
+          onPick={pickWoman}
+          onAdded={womanAdded}
+        />
       )}
 
       {analysis && (
         <>
           {phase === 'saved' && savedOffline && (
-            <div className="saved-banner saved-offline" role="status"><Bi k="savedOffline" always /></div>
+            <div className="saved-banner saved-offline" role="status">
+              <Bi k="savedOffline" always />
+            </div>
           )}
           {phase === 'saved' && !savedOffline && (
             <div className={`saved-banner risk-${analysis.risk}`}>
@@ -500,19 +654,39 @@ export default function RecordView({ status, people, symptomLabels, samples, pre
           )}
           <AlertList alerts={analysis.alerts} />
           <section className="card readback">
-            <h3>🔊 <Bi k="readbackTitle" inline /></h3>
+            <h3>
+              🔊 <Bi k="readbackTitle" inline />
+            </h3>
             <Bi hi={analysis.summary_hi} en={analysis.summary_en} className="readback-text" />
           </section>
           {analysis.engine_note && <p className="note">ℹ️ {analysis.engine_note}</p>}
-          <FieldsCard fields={analysis.fields} people={people} symptomLabels={symptomLabels} today={status?.today}
-            onChange={onFieldsChange} disabled={phase === 'saving' || phase === 'saved'} />
+          <FieldsCard
+            fields={analysis.fields}
+            people={people}
+            symptomLabels={symptomLabels}
+            today={status?.today}
+            onChange={onFieldsChange}
+            disabled={phase === 'saving' || phase === 'saved'}
+          />
           <div className="actions">
             {phase !== 'saved' && (
-              <button type="button" className="btn btn-secondary" onClick={() => readBackAndConfirm(analysis)}
-                disabled={busy || phase === 'speaking'}><Bi k="readAgain" /></button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => readBackAndConfirm(analysis)}
+                disabled={busy || phase === 'speaking'}
+              >
+                <Bi k="readAgain" />
+              </button>
             )}
-            <button type="button" className={`btn ${phase === 'saved' ? 'btn-primary btn-big' : 'btn-secondary'}`}
-              onClick={discardAndStartNew} disabled={phase === 'saving'}><Bi k="newVisit" /></button>
+            <button
+              type="button"
+              className={`btn ${phase === 'saved' ? 'btn-primary btn-big' : 'btn-secondary'}`}
+              onClick={discardAndStartNew}
+              disabled={phase === 'saving'}
+            >
+              <Bi k="newVisit" />
+            </button>
           </div>
         </>
       )}

@@ -19,8 +19,7 @@ PEOPLE = [
 
 
 def make_settings(tmp_path, **overrides) -> Settings:
-    base = dict(db_path=tmp_path / "test.db", static_dir=tmp_path / "no-static", sarvam_api_key="",
-                gemini_api_key="")
+    base = dict(db_path=tmp_path / "test.db", static_dir=tmp_path / "no-static", sarvam_api_key="", gemini_api_key="")
     base.update(overrides)
     return Settings(**base)
 

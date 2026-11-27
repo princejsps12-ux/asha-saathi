@@ -15,7 +15,11 @@ function read(storage) {
 }
 
 function write(items, storage) {
-  try { storage?.setItem(QUEUE_KEY, JSON.stringify(items)) } catch { /* storage full / blocked */ }
+  try {
+    storage?.setItem(QUEUE_KEY, JSON.stringify(items))
+  } catch {
+    /* storage full / blocked */
+  }
 }
 
 export const queuedVisits = (storage = globalThis.localStorage) => read(storage)
@@ -41,10 +45,16 @@ export async function flushQueue(save, storage = globalThis.localStorage) {
     try {
       await save(item.transcript, item.fields)
       sent += 1
-      write(read(storage).filter((it) => it.id !== item.id), storage)
+      write(
+        read(storage).filter((it) => it.id !== item.id),
+        storage,
+      )
     } catch (err) {
       if (!(err instanceof ApiError) || err.key === 'err_unreachable' || err.status >= 500) break // offline
-      write(read(storage).map((it) => (it.id === item.id ? { ...it, failed: true } : it)), storage)
+      write(
+        read(storage).map((it) => (it.id === item.id ? { ...it, failed: true } : it)),
+        storage,
+      )
     }
   }
   return { sent, left: read(storage).length }

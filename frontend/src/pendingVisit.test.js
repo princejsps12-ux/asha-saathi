@@ -1,21 +1,38 @@
 import { describe, expect, it } from 'vitest'
 import {
-  PENDING_KEY, PENDING_MAX_AGE_MS, clearDraft, clearPending, loadDraft, loadPending, saveDraft, savePending,
+  PENDING_KEY,
+  PENDING_MAX_AGE_MS,
+  clearDraft,
+  clearPending,
+  loadDraft,
+  loadPending,
+  saveDraft,
+  savePending,
 } from './pendingVisit.js'
 
 const memoryStorage = () => {
   const data = {}
   return {
     getItem: (k) => data[k] ?? null,
-    setItem: (k, v) => { data[k] = v },
-    removeItem: (k) => { delete data[k] },
+    setItem: (k, v) => {
+      data[k] = v
+    },
+    removeItem: (k) => {
+      delete data[k]
+    },
     data,
   }
 }
 const blocked = {
-  getItem: () => { throw new Error('SecurityError') },
-  setItem: () => { throw new Error('QuotaExceeded') },
-  removeItem: () => { throw new Error('SecurityError') },
+  getItem: () => {
+    throw new Error('SecurityError')
+  },
+  setItem: () => {
+    throw new Error('QuotaExceeded')
+  },
+  removeItem: () => {
+    throw new Error('SecurityError')
+  },
 }
 const analysis = { fields: { beneficiary_id: 1, bp_heard: '15/100', bp_unclear: true }, alerts: [], unclear: ['bp'] }
 

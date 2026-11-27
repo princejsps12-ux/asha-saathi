@@ -56,19 +56,27 @@ describe('resolveAnswer', () => {
     expect(await resolveAnswer('hmm', clear, fakeApi('unknown', { changed: false }))).toEqual({ action: 'nochange' })
   })
   it('a failing correction request falls back to yes / no', async () => {
-    const api = { intent: vi.fn().mockResolvedValue({ intent: 'yes' }), extract: vi.fn().mockRejectedValue(new Error()) }
+    const api = {
+      intent: vi.fn().mockResolvedValue({ intent: 'yes' }),
+      extract: vi.fn().mockRejectedValue(new Error()),
+    }
     expect(await resolveAnswer('हाँ', base, api)).toEqual({ action: 'save' })
   })
 })
 
 describe('a non-empty answer is never "didn\'t understand"', () => {
   const readBack = {
-    summary_hi: 'सुनीता साहू। 7 महीने की गर्भवती। बीपी 150 बटा 100। लक्षण: पैरों में सूजन। बच्चे की हलचल कम है। '
-      + 'अगली विज़िट 4 दिसंबर। क्या यह सही है? हाँ या नहीं बोलिए।',
+    summary_hi:
+      'सुनीता साहू। 7 महीने की गर्भवती। बीपी 150 बटा 100। लक्षण: पैरों में सूजन। बच्चे की हलचल कम है। ' +
+      'अगली विज़िट 4 दिसंबर। क्या यह सही है? हाँ या नहीं बोलिए।',
     summary_en: 'Sunita Sahu. 7 months pregnant. BP 150/100. Symptoms: swelling (feet). Baby movement reduced.',
-    fields: { beneficiary_id: 1 }, unclear: [],
+    fields: { beneficiary_id: 1 },
+    unclear: [],
   }
-  const unchanged = { intent: vi.fn().mockResolvedValue({ intent: 'unknown' }), extract: vi.fn().mockResolvedValue({ changed: false }) }
+  const unchanged = {
+    intent: vi.fn().mockResolvedValue({ intent: 'unknown' }),
+    extract: vi.fn().mockResolvedValue({ changed: false }),
+  }
 
   it('the phone mic picking up our own read-back is an echo (listen again), not an error', async () => {
     const echo = 'सुनीता साहू 7 महीने की गर्भवती बीपी 150 बटा 100 लक्षण पैरों में सूजन'
