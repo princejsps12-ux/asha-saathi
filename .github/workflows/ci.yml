@@ -14,8 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: backend } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -30,8 +30,8 @@ jobs:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: frontend } }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -45,7 +45,7 @@ jobs:
     name: judge-test (fresh checkout, no .env, no secrets, README command)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4 # fresh checkout of this commit
+      - uses: actions/checkout@v7 # fresh checkout of this commit
 
       - name: Confirm there is no .env file and no API keys
         run: |
@@ -62,7 +62,10 @@ jobs:
           echo "compose port: $PORT"
           echo "APP=http://localhost:$PORT" >> "$GITHUB_ENV"
           for i in $(seq 1 90); do
-            if curl -sf "http://localhost:$PORT/api/health" >/dev/null; then echo "OK: app answered after ~$((i * 2)) s"; exit 0; fi
+            if curl -sf "http://localhost:$PORT/api/health" >/dev/null; then
+              echo "::notice title=judge-test: app is up::Answered on compose port $PORT after ~$((i * 2)) s, no .env, no secrets"
+              exit 0
+            fi
             sleep 2
           done
           echo "FAIL: app did not answer on port $PORT"; docker compose logs app; exit 1
@@ -80,6 +83,7 @@ jobs:
           echo "OK: app bundle $JS loads and contains our Hindi UI"
           curl -sf "$APP/api/status" | grep -q '"offline_mode":true' || fail "not in no-key mode"
           echo "OK: running in no-key mode"
+          echo "::notice title=judge-test: main page::Title 'ASHA Saathi · आशा साथी', our bundle $JS loads, no-key mode"
 
       - name: Extract API parses BP 150/100 from a Hindi sentence
         run: |
@@ -92,6 +96,8 @@ jobs:
           BP=$(jq -r '"\(.fields.bp_systolic)/\(.fields.bp_diastolic)"' result.json)
           if [ "$BP" != "150/100" ]; then echo "FAIL: expected BP 150/100, got $BP"; exit 1; fi
           echo "OK: BP 150/100 parsed from the Hindi sentence"
+          SUMMARY=$(jq -c '{bp: "\(.fields.bp_systolic)/\(.fields.bp_diastolic)", month: .fields.pregnancy_month, woman: .fields.beneficiary_name_en, risk}' result.json)
+          echo "::notice title=judge-test: extract API::'$SENTENCE' -> $SUMMARY"
 
       - name: docker compose down
         if: always()
@@ -149,9 +155,9 @@ jobs:
           $crlf = git ls-files --eol | Select-String 'w/crlf'
           if ($crlf) { $crlf; throw "files were checked out with CRLF line endings" }
           "all text files checked out with LF"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with: { node-version: "22" }
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with: { python-version: "3.12" }
       - name: Frontend lint + Prettier + tests on the Windows checkout
         working-directory: asha-saathi/frontend
