@@ -41,6 +41,62 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  judge-test:
+    name: judge-test (fresh checkout, no .env, no secrets, README command)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4 # fresh checkout of this commit
+
+      - name: Confirm there is no .env file and no API keys
+        run: |
+          if [ -e .env ]; then echo "FAIL: .env exists"; exit 1; fi
+          if env | grep -E '^(SARVAM|GEMINI)_'; then echo "FAIL: API key variables are set"; exit 1; fi
+          echo "OK: no .env file, no SARVAM_* / GEMINI_* variables; this job uses no secrets"
+
+      - name: docker compose up -d --build (exactly as the README says)
+        run: docker compose up -d --build
+
+      - name: Wait until the app responds on the compose port
+        run: |
+          PORT=$(docker compose port app 8000 | cut -d: -f2)
+          echo "compose port: $PORT"
+          echo "APP=http://localhost:$PORT" >> "$GITHUB_ENV"
+          for i in $(seq 1 90); do
+            if curl -sf "http://localhost:$PORT/api/health" >/dev/null; then echo "OK: app answered after ~$((i * 2)) s"; exit 0; fi
+            sleep 2
+          done
+          echo "FAIL: app did not answer on port $PORT"; docker compose logs app; exit 1
+
+      - name: Main page is our app, not a default page
+        run: |
+          fail() { echo "FAIL: $1"; exit 1; }
+          curl -sf "$APP/" -o page.html || fail "main page did not load"
+          grep -q '<title>ASHA Saathi · आशा साथी</title>' page.html || fail "page title is not ASHA Saathi"
+          echo "OK: title is 'ASHA Saathi · आशा साथी'"
+          grep -q '<div id="root">' page.html || fail "React mount point missing"
+          JS=$(grep -o '/assets/index-[A-Za-z0-9_-]*[.]js' page.html | head -1)
+          [ -n "$JS" ] || fail "no app bundle referenced"
+          curl -sf "$APP$JS" | grep -q 'नमूना' || fail "app bundle $JS missing or not our app"
+          echo "OK: app bundle $JS loads and contains our Hindi UI"
+          curl -sf "$APP/api/status" | grep -q '"offline_mode":true' || fail "not in no-key mode"
+          echo "OK: running in no-key mode"
+
+      - name: Extract API parses BP 150/100 from a Hindi sentence
+        run: |
+          SENTENCE='सुनीता साहू सात महीने की गर्भवती है, बीपी 150 बाय 100 है, पैरों में सूजन है'
+          echo "sentence: $SENTENCE"
+          jq -n --arg t "$SENTENCE" '{transcript: $t}' > body.json
+          curl -sf -X POST "$APP/api/extract" -H 'content-type: application/json' --data @body.json -o result.json
+          jq '{bp: "\(.fields.bp_systolic)/\(.fields.bp_diastolic)", month: .fields.pregnancy_month,
+               woman: .fields.beneficiary_name_en, risk, alerts: [.alerts[].title_en]}' result.json
+          BP=$(jq -r '"\(.fields.bp_systolic)/\(.fields.bp_diastolic)"' result.json)
+          if [ "$BP" != "150/100" ]; then echo "FAIL: expected BP 150/100, got $BP"; exit 1; fi
+          echo "OK: BP 150/100 parsed from the Hindi sentence"
+
+      - name: docker compose down
+        if: always()
+        run: docker compose down
+
   judge-amd64:
     name: Judge run on linux/amd64 (fresh clone, no cache, no keys, sample chip in Chrome)
     runs-on: ubuntu-latest # a real x86_64 machine: no emulation
