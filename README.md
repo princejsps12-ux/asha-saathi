@@ -13,11 +13,15 @@
 
 ## Judge quickstart
 
-```bash
-git clone https://github.com/princejsps12-ux/asha-saathi.git && cd asha-saathi && docker compose up
+Same three commands on every OS — Linux / macOS terminal or Windows PowerShell (each line on its own, so it also works in Windows PowerShell 5.1):
+
+```
+git clone https://github.com/princejsps12-ux/asha-saathi.git
+cd asha-saathi
+docker compose up
 ```
 
-Then open **http://localhost:8000** (Chrome or Edge for the microphone).
+Wait for `ASHA Saathi is running → open http://localhost:8000` (the first build takes a few minutes; later starts are seconds). Then open **http://localhost:8000** (Chrome or Edge for the microphone).
 **No mic? Tap any sample chip** under *▶ नमूना चलाएँ / Try sample*. It runs a real visit note through the whole pipeline: fields, danger alerts, read-back, then tap **हाँ ✓ Yes** to save. Only Docker is needed; no keys, no Node or Python on your machine. Lint and all tests run inside the build.
 
 *The live app is on Render's free tier: after 15 idle minutes the first visit takes about 25–50 s to wake up, and saved visits reset when it sleeps.*
@@ -221,19 +225,41 @@ The referral level follows the 2010 ANC guideline's **Box 7**, which sorts each 
 
 ## How to run
 
-```bash
+```
 git clone https://github.com/princejsps12-ux/asha-saathi.git
 cd asha-saathi
-docker compose up          # builds (lint + all tests), starts, prints "open http://localhost:8000"
+docker compose up
 ```
 
-- Tests again on their own: `docker compose run --rm test` (pytest) · `docker compose run --rm test-web` (vitest)
-- After pulling new code: `docker compose up --build`
-- Another port: `PORT=9000 docker compose up`
-- Fresh demo data: tap **↺ Reset demo data** in the app (it also clears the visit screen), or `docker compose down -v`
-- Without Docker: `cd backend && pip install -r requirements-dev.txt && DB_PATH=./asha.db python -m app.serve`, plus `cd frontend && npm ci && npm run dev` (Vite proxies `/api` to the backend)
+`docker compose up` builds the image (lint + all tests run inside the build), starts it and prints `open http://localhost:8000`. Stop it with `Ctrl+C`.
 
-**Requirements:** Docker with Compose v2. No API keys, no Node or Python on the host.
+| Task | Linux / macOS (bash, zsh) | Windows PowerShell |
+|---|---|---|
+| Run the tests again | `docker compose run --rm test` · `docker compose run --rm test-web` | same |
+| After pulling new code | `docker compose up --build` | same |
+| Use another port | `PORT=9000 docker compose up` | `$env:PORT = "9000"; docker compose up` |
+| Fresh demo data | tap **↺ Reset demo data** in the app, or `docker compose down -v` | same |
+
+**Requirements:** Docker with Compose v2 (Docker Desktop on Windows / macOS, Docker Engine on Linux). No API keys, no Node or Python on the host. Line endings are pinned to LF in `.gitattributes`, so a Windows checkout builds the same as Linux.
+
+<details><summary>Without Docker (for development)</summary>
+
+Backend, in one terminal (Python 3.12):
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+DB_PATH=./asha.db python -m app.serve            # PowerShell: $env:DB_PATH = "./asha.db"; python -m app.serve
+```
+
+Frontend, in a second terminal (Node 22):
+
+```bash
+cd frontend
+npm ci
+npm run dev                                      # Vite proxies /api to the backend
+```
+</details>
 
 ## Project structure
 

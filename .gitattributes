@@ -1,0 +1,13 @@
+# Check out text files with LF line endings on every OS (incl. Git for Windows' default
+# core.autocrlf=true). Docker copies these files into Linux containers, where the build runs
+# Prettier / ruff format checks that expect LF, and shell-style files must not contain CR.
+* text=auto eol=lf
+
+# Binary files: never touch line endings.
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
+*.mp4 binary
+*.woff binary
+*.woff2 binary

@@ -41,18 +41,87 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  docker:
-    name: Docker build + health check (no keys)
-    runs-on: ubuntu-latest
+  judge-amd64:
+    name: Judge run on linux/amd64 (fresh clone, no cache, no keys, sample chip in Chrome)
+    runs-on: ubuntu-latest # a real x86_64 machine: no emulation
     needs: [backend, frontend]
+    env:
+      DOCKER_DEFAULT_PLATFORM: linux/amd64
+      COMPOSE_PROJECT_NAME: asha-saathi
     steps:
-      - uses: actions/checkout@v4
-      - name: docker compose up (exactly as in the README)
-        run: docker compose up -d --build
-      - name: Wait for the app and check the API and the page
+      - name: Fresh clone, exactly as in the README
         run: |
-          for i in $(seq 1 60); do curl -sf http://localhost:8000/api/health && break; sleep 2; done
+          git clone ${{ github.server_url }}/${{ github.repository }}.git asha-saathi
+          cd asha-saathi && git checkout --quiet ${{ github.sha }}
+          test ! -e .env && echo "no .env file"
+          env | grep -E '^(SARVAM|GEMINI)_' && exit 1 || echo "no API keys in the environment"
+      - name: Clear the build cache and build with --no-cache
+        working-directory: asha-saathi
+        run: |
+          uname -m
+          docker builder prune -af
+          docker compose build --no-cache
+          docker image inspect asha-saathi-app --format 'image platform: {{.Os}}/{{.Architecture}}'
+      - name: docker compose up and wait for the printed URL
+        working-directory: asha-saathi
+        run: |
+          docker compose up -d
+          for i in $(seq 1 60); do docker compose logs app | grep -q 'open  http://localhost:8000' && break; sleep 2; done
+          docker compose logs app | grep -E 'is running|No-key mode'
           curl -sf http://localhost:8000/api/status | grep -q '"offline_mode":true'
-          curl -sf http://localhost:8000/ | grep -q '<div id="root">'
+      - name: Open the app in Chrome and tap a sample chip
+        run: |
+          mkdir judge && cd judge && npm init -y >/dev/null && npm install --no-audit --no-fund puppeteer-core@23.11.1 >/dev/null
+          cp ../asha-saathi/.github/scripts/judge-check.mjs . && node judge-check.mjs http://localhost:8000
       - if: always()
-        run: docker compose logs --no-color | tail -50
+        working-directory: asha-saathi
+        run: docker compose logs --no-color | tail -40
+
+  windows:
+    name: Windows (PowerShell 5.1, Git defaults, README steps)
+    runs-on: windows-latest
+    defaults: { run: { shell: powershell } } # Windows PowerShell 5.1, not pwsh
+    steps:
+      - name: Clone with Git for Windows' default line-ending setting, as in the README
+        run: |
+          $ErrorActionPreference = 'Continue' # judge success by exit codes, not by stderr chatter
+          $PSVersionTable.PSVersion.ToString()
+          git config --global core.autocrlf true
+          git clone -q ${{ github.server_url }}/${{ github.repository }}.git
+          cd asha-saathi
+          git checkout --quiet ${{ github.sha }}
+          $crlf = git ls-files --eol | Select-String 'w/crlf'
+          if ($crlf) { $crlf; throw "files were checked out with CRLF line endings" }
+          "all text files checked out with LF"
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Frontend lint + Prettier + tests on the Windows checkout
+        working-directory: asha-saathi/frontend
+        run: |
+          $ErrorActionPreference = 'Continue'
+          npm ci --no-audit --no-fund
+          if ($LASTEXITCODE) { exit 1 }
+          npm run lint
+          if ($LASTEXITCODE) { exit 1 }
+          npm test
+          if ($LASTEXITCODE) { exit 1 }
+      - name: Backend ruff + tests on the Windows checkout
+        working-directory: asha-saathi/backend
+        run: |
+          $ErrorActionPreference = 'Continue'
+          pip install -r requirements-dev.txt
+          if ($LASTEXITCODE) { exit 1 }
+          ruff check .
+          if ($LASTEXITCODE) { exit 1 }
+          ruff format --check .
+          if ($LASTEXITCODE) { exit 1 }
+          pytest
+          if ($LASTEXITCODE) { exit 1 }
+      - name: README's PowerShell port command gives the right compose port
+        working-directory: asha-saathi
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $env:PORT = "9000"; docker compose config | Select-String '9000'
+          if (-not (docker compose config | Select-String 'published: "9000"')) { throw "PORT was not applied" }
